@@ -36,13 +36,22 @@ jobs:
       - name: Inspect macOS Python
         run: |
           echo "=== Python directory ==="
-          ls -la lib/macos_arm64/python
+          ls -la lib/macos_arm64/python || true
+
           echo "=== Python bin ==="
-          ls -la lib/macos_arm64/python/bin
-          echo "=== Python include ==="
-          find lib/macos_arm64/python -maxdepth 3 -type d -name "include" -print
+          ls -la lib/macos_arm64/python/bin || true
+
+          echo "=== Python include directories ==="
+          find lib/macos_arm64/python -maxdepth 5 -type d -name "include" -print || true
+
+          echo "=== Python headers ==="
+          find lib/macos_arm64/python -maxdepth 6 \( -name "Python.h" -o -name "pyconfig.h" \) -print || true
+
           echo "=== Python libraries ==="
-          find lib/macos_arm64/python -maxdepth 4 \( -name "*.a" -o -name "*.dylib" -o -name "Python.framework" \) -print
+          find lib/macos_arm64/python -maxdepth 6 \( -name "*.a" -o -name "*.dylib" -o -name "Python.framework" -o -name "libpython*" \) -print || true
+
+          echo "=== Python config files ==="
+          find lib/macos_arm64/python -maxdepth 6 -iname "*python*config*" -print || true
 
       - name: Install build tools
         run: |
