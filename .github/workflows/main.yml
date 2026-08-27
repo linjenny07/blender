@@ -9,6 +9,7 @@ jobs:
       - name: Checkout Blender Source
         uses: actions/checkout@v4
         with:
+        repository: 'blender/blender'
           ref: ios
           lfs: true
 
