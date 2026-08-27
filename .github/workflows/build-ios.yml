@@ -15,7 +15,7 @@ jobs:
           repository: linjenny07/blender
           ref: ios
           submodules: recursive
-          lfs: false
+          lfs: true
 
       - name: Install build tools
         run: |
