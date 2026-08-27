@@ -24,6 +24,15 @@ jobs:
             cd lib/ios_arm64
             git checkout 393201c7c8525941553f6a96e19b909d6b3bfc4f
 
+      - name: Fetch macOS ARM64 libraries
+        run: |
+          rm -rf lib/macos_arm64
+          git clone https://projects.blender.org/blender/lib-macos_arm64.git lib/macos_arm64
+          cd lib/macos_arm64
+          git checkout a241b11
+          git lfs install
+          git lfs pull
+
       - name: Install build tools
         run: |
           brew install cmake ninja
