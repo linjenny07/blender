@@ -1,0 +1,73 @@
+name: Build Blender iPad
+
+on:
+  workflow_dispatch:
+  push:
+
+jobs:
+  build-ios:
+    runs-on: macos-14
+
+    steps:
+      - name: Checkout iOS branch
+        uses: actions/checkout@v4
+        with:
+          repository: linjenny07/blender
+          ref: ios
+          submodules: recursive
+          lfs: false
+
+      - name: Install build tools
+        run: |
+          brew update
+          brew install cmake ninja
+
+      - name: Show Apple toolchain
+        run: |
+          xcodebuild -version
+          xcrun --sdk iphoneos --show-sdk-path
+          cmake --version
+          ninja --version
+
+      - name: Fetch Blender libraries
+        run: |
+          ./build_files/utils/make_update.py --no-libraries
+
+      - name: Configure iOS build
+        run: |
+          cmake -S . -B build_ios \
+            -G Xcode \
+            -DCMAKE_SYSTEM_NAME=iOS \
+            -DCMAKE_OSX_SYSROOT=iphoneos \
+            -DCMAKE_OSX_ARCHITECTURES=arm64 \
+            -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build Blender
+        run: |
+          cmake --build build_ios \
+            --config Release \
+            --parallel $(sysctl -n hw.ncpu)
+
+      - name: Find Blender.app
+        run: |
+          echo "Searching for Blender.app..."
+          find build_ios -type d -name "Blender.app" -print
+
+      - name: Package unsigned IPA
+        run: |
+          APP="$(find build_ios -type d -name "Blender.app" -print -quit)"
+
+          if [ -z "$APP" ]; then
+            echo "ERROR: Blender.app was not produced."
+            exit 1
+          fi
+
+          mkdir -p Payload
+          cp -R "$APP" Payload/Blender.app
+          /usr/bin/ditto -c -k --sequesterRsrc --keepParent Payload Blender-iPad-unsigned.ipa
+
+      - name: Upload IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: Blender-iPad-unsigned
+          path: Blender-iPad-unsigned.ipa
