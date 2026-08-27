@@ -1,6 +1,6 @@
 name: Compile Latest Blender iPad App
 on:
-push:
+  push:
   workflow_dispatch:
 
 jobs:
