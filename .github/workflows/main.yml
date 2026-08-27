@@ -14,6 +14,10 @@ jobs:
           ref: ios
           lfs: false
 
+      - name: Install Developemnt Tools
+        run: |
+          brew install cmake ninja
+          
       - name: Setup macOS Environment Paths
         run: |
           brew install cmake ninja
