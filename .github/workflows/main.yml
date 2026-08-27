@@ -19,6 +19,13 @@ jobs:
           brew install cmake ninja
           echo "/opt/homebrew/bin" >> $GITHUB_PATH
 
+      - name: Download Official Pre-Compiled iPad Libraries
+        run: |
+          cd ..
+          mkdir -p lib
+          cd lib
+          svn checkout https://blender.org
+
       - name: Genertae Core Project Files
         run: |
           mkdir build_ios 
