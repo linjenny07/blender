@@ -18,11 +18,11 @@ jobs:
           lfs: false
 
       - name: Fetch iOS libraries
-       run: |
-         rm -rf lib/ios_arm64
-         git clone --branch blender-v5.1-release \
-           https://projects.blender.org/blender/lib-ios_arm64.git \
-           lib/ios_arm64
+        run: |
+          rm -rf lib/ios_arm64
+          git clone --branch blender-v5.1-release \
+            https://projects.blender.org/blender/lib-ios_arm64.git \
+            lib/ios_arm64
 
       - name: Install build tools
         run: |
