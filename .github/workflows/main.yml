@@ -18,6 +18,11 @@ jobs:
         run: |
           brew install cmake ninja
 
+      - name: Setup Workspace Directory
+        run: |
+          cd.. 
+          mkdir -p lib/darwin_arm64
+
       - name: Fetch Offical Apple iPad Libraries
         run: |
           python3 ./build_files/utils/make_update.py --use-ios-libraries
