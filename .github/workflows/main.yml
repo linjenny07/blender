@@ -23,10 +23,6 @@ jobs:
           cd.. 
           mkdir -p lib/darwin_arm64
 
-      - name: Fetch Offical Apple iPad Libraries
-        run: |
-          python3 ./build_files/utils/make_update.py --use-ios-libraries
-
       - name: Configure CMake for iOS App
         run: |
           mkdir build_ios
@@ -35,6 +31,7 @@ jobs:
           -DCMAKE_SYSTEM_NAME=iOS \
           -DCMAKE_OSX_SYSROOT=iphoneos \
           -DCMAKE_BUILD_TYPE=RELEASE \
+          -DWITH_COMPILER_ASAN=OFF \
           ../blender
 
       - name: Compile Code
