@@ -14,19 +14,15 @@ jobs:
           ref: ios
           lfs: false
 
-      - name: Install Development Tools
+      - name: Setup macOS Environment Paths
         run: |
           brew install cmake ninja
+          echo "/opt/homebrew/bin" >> $GITHUB_PATH
 
-      - name: Setup Workspace Directory
+      - name: Genertae Core Project Files
         run: |
-          cd.. 
-          mkdir -p lib/darwin_arm64
-
-      - name: Configure CMake for iOS App
-        run: |
-          mkdir build_ios
-          cd build_ios
+          mkdir build_ios 
+          cd build_ios 
           cmake -G Ninja \
           -DCMAKE_SYSTEM_NAME=iOS \
           -DCMAKE_OSX_SYSROOT=iphoneos \
@@ -34,15 +30,15 @@ jobs:
           -DWITH_COMPILER_ASAN=OFF \
           ../blender
 
-      - name: Compile Code
+      - name: Run Native Compilation
         run: |
-          cd build_ios
-          ninja
-
+          cd build_ios 
+          /opt/homebrew/bin/ninja
+            
       - name: Package Into IPA Payload
         run: | 
           mkdir -p Payload 
-          cp -r build_ios/bin/Blender.app Payload/
+          cp -r build_ios/bin/Blender.app Payload/ 2>/dev/null || cp -r build_ios/Blender.app Payload/
           zip -r Blender_Latest.ipa Payload
 
       - name: Upload Finished IPA
