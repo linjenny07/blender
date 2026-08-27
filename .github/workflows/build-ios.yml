@@ -33,6 +33,17 @@ jobs:
           git lfs install
           git lfs pull
 
+      - name: Inspect macOS Python
+        run: |
+          echo "=== Python directory ==="
+          ls -la lib/macos_arm64/python
+          echo "=== Python bin ==="
+          ls -la lib/macos_arm64/python/bin
+          echo "=== Python include ==="
+          find lib/macos_arm64/python -maxdepth 3 -type d -name "include" -print
+          echo "=== Python libraries ==="
+          find lib/macos_arm64/python -maxdepth 4 \( -name "*.a" -o -name "*.dylib" -o -name "Python.framework" \) -print
+
       - name: Install build tools
         run: |
           brew install cmake ninja
