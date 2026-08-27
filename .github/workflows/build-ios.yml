@@ -19,7 +19,6 @@ jobs:
 
       - name: Install build tools
         run: |
-          brew update
           brew install cmake ninja
 
       - name: Show Apple toolchain
