@@ -12,7 +12,7 @@ jobs:
         with:
           repository: 'blender/blender'
           ref: ios
-          lfs: true
+          lfs: false
 
       - name: Install Development Tools
         run: |
