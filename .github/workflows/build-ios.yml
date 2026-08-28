@@ -111,33 +111,14 @@ jobs:
 
       - name: Inspect OpenEXR
         run: |
-          echo "================================"
-          echo " SEARCHING FOR OPENEXR"
-          echo "================================"
+          echo "=== OpenEXR directory ==="
+          ls -la lib/ios_arm64/openexr
 
-          echo "--- iOS OpenEXR ---"
-          find "$PWD/lib/ios_arm64" -iname "openexr" -print
+          echo "=== OpenEXR include ==="
+          ls -la lib/ios_arm64/openexr/include/OpenEXR | head -30
 
-          echo "--- OpenEXR config files ---"
-          find "$PWD/lib/ios_arm64"
-          ( -name "OpenEXRConfig.cmake"
-          -o -name "openexr-config.cmake"
-          -o -name "OpenEXRConfigVersion.cmake" )
-          -print
-
-          echo "--- OpenEXR headers ---"
-          find "$PWD/lib/ios_arm64"
-          ( -name "Imf*.h" -o -name "OpenEXR*.h" )
-          -print | head -50
-
-          echo "--- OpenEXR libraries ---"
-          find "$PWD/lib/ios_arm64"
-          ( -name "libOpenEXR*.a" -o -name "libOpenEXR*.dylib" )
-          -print
-
-          echo "================================"
-          echo " END OPENEXR SEARCH"
-          echo "================================"
+          echo "=== OpenEXR files ==="
+          find lib/ios_arm64/openexr -maxdepth 4 -type f -print | head -100
 
       - name: Configure iOS build
         run: |
