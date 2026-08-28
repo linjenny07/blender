@@ -229,6 +229,48 @@ jobs:
           echo "=== OpenEXRConfig.cmake ==="
           cat "$OPENEXR_CMAKE_DIR/OpenEXRConfig.cmake"
 
+      - name: 
+        run: |
+          echo "========================================" 
+          echo "PNG DIAGNOSTIC" 
+          echo "========================================" 
+          
+          echo "" 
+          echo "=== PNG directory ===" 
+          ls -la lib/ios_arm64/png || true
+          
+          echo "" 
+          echo "=== PNG files ===" 
+          find lib/ios_arm64/png \ 
+            -type f \ 
+            -print \ 
+            || true 
+          
+          echo "" 
+          echo "=== PNG headers ===" 
+          find lib/ios_arm64/png \ 
+            -type f \ \( -name "*.h" -o -name "*.hpp" \) \ 
+            -print \ 
+            || true 
+            
+          echo "" 
+          echo "=== PNG libraries ===" 
+          find lib/ios_arm64/png \ 
+            -type f \ \( -name "*.a" -o -name "*.dylib" -o -name "*.tbd" \) \ 
+            -print \ 
+            || true 
+            
+          echo "" 
+          echo "=== PNG CMake/package files ===" 
+          find lib/ios_arm64/png \ 
+            -type f \ 
+            \( \ -name "*.cmake" \ 
+              -o -name "*.cps" \ 
+              -o -name "*Config*" \ 
+              -o -name "*config*" \ \) \ 
+              -print \ 
+              || true
+
       - name: Configure iOS build
         run: |
           PYTHON_ROOT="$PWD/lib/macos_arm64/python"
