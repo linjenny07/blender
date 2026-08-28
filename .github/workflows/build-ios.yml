@@ -131,6 +131,8 @@ jobs:
 
           "$PYTHON_EXECUTABLE" --version
 
+          rm -rf build_ios
+
           cmake -S . -B build_ios \
             -G Xcode \
             -DCMAKE_SYSTEM_NAME=iOS \
@@ -141,7 +143,7 @@ jobs:
             -DPYTHON_EXECUTABLE="$PYTHON_EXECUTABLE" \
             -DPYTHON_INCLUDE_DIR="$PYTHON_INCLUDE_DIR" \
             -DPYTHON_LIBRARY="$PYTHON_LIBRARY" \
-            -DPYTHON_INCLUDE_CONFIG_DIR="$PYTHON_INCLUDE_CONFIG_DIR""
+            -DPYTHON_INCLUDE_CONFIG_DIR="$PYTHON_INCLUDE_CONFIG_DIR"
 
       - name: Build Blender
         run: |
