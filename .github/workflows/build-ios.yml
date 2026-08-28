@@ -21,8 +21,8 @@ jobs:
         run: |
           rm -rf lib/ios_arm64
           git clone https://projects.blender.org/blender/lib-ios_arm64.git lib/ios_arm64
-            cd lib/ios_arm64
-            git checkout 393201c7c8525941553f6a96e19b909d6b3bfc4f
+          cd lib/ios_arm64
+          git checkout 393201c7c8525941553f6a96e19b909d6b3bfc4f
 
       - name: Fetch macOS ARM64 libraries
         run: |
@@ -35,25 +35,48 @@ jobs:
 
       - name: Inspect macOS Python
         run: |
+          echo "========================================"
+          echo "MACOS PYTHON DIAGNOSTIC"
+          echo "========================================"
+
+          echo ""
           echo "=== Python directory ==="
           ls -la lib/macos_arm64/python || true
 
+          echo ""
           echo "=== Python bin ==="
           ls -la lib/macos_arm64/python/bin || true
 
+          echo ""
           echo "=== Python include directories ==="
-          find lib/macos_arm64/python -type d -name "include" -print
+          find lib/macos_arm64/python -type d -name "include" -print || true
 
+          echo ""
           echo "=== Python.h ==="
-          find lib/macos_arm64/python -name "Python.h" -print
+          find lib/macos_arm64/python -name "Python.h" -print || true
 
+          echo ""
           echo "=== Python libraries ==="
-          find lib/macos_arm64/python \( -name "libpython*" -o -name "Python.framework" \) -print
+          find lib/macos_arm64/python \
+            \( -name "libpython*" -o -name "Python.framework" \) \
+            -print || true
 
+          echo ""
           echo "=== Python 3.13 files ==="
-          find lib/macos_arm64/python -maxdepth 5 \
-            \( -name "python3.13" -o -name "Python.h" -o -name "libpython3.13*" \) \
-            -print
+          find lib/macos_arm64/python -maxdepth 6 \
+            \( -name "python3.13" \
+            -o -name "Python.h" \
+            -o -name "libpython3.13*" \) \
+            -print || true
+
+          echo ""
+          echo "=== Python executable information ==="
+          if [ -f "lib/macos_arm64/python/bin/python3.13" ]; then
+            file lib/macos_arm64/python/bin/python3.13
+            lib/macos_arm64/python/bin/python3.13 --version
+          else
+            echo "python3.13 executable NOT FOUND"
+          fi
 
       - name: Install build tools
         run: |
@@ -66,9 +89,18 @@ jobs:
           cmake --version
           ninja --version
 
-      - name: Fetch Blender libraries
+      - name: Verify library layout
         run: |
-          ./build_files/utils/make_update.py --no-libraries
+          echo "=== lib directory ==="
+          ls -la lib
+
+          echo ""
+          echo "=== iOS library directory ==="
+          ls -la lib/ios_arm64 | head -100
+
+          echo ""
+          echo "=== macOS library directory ==="
+          ls -la lib/macos_arm64 | head -100
 
       - name: Configure iOS build
         run: |
