@@ -11,8 +11,6 @@ jobs:
     steps:
       - name: Checkout Blender Source
         uses: actions/checkout@v4
-        env:
-          GIT_LFS_SKIP_SMUDGE: "1"
         with:
           repository: linjenny07/blender
           ref: ios
@@ -22,6 +20,7 @@ jobs:
       - name: Install Build Tools
         run: |
           brew install cmake ninja
+          echo "/opt/homebrew/bin" >> "$GITHUB_PATH"
 
       - name: Fetch Blender Libraries
         run: |
@@ -44,163 +43,143 @@ jobs:
           git lfs install
           git lfs pull
 
-      - name: Show Apple Toolchain
+      - name: Verify Required Dependencies
         run: |
-          echo "========================================"
-          echo "APPLE TOOLCHAIN"
-          echo "========================================"
+          set -e
 
-          xcodebuild -version
-
-          echo ""
-          echo "=== iOS SDK ==="
-          xcrun --sdk iphoneos --show-sdk-path
-
-          echo ""
-          echo "=== CMake ==="
-          cmake --version
-
-          echo ""
-          echo "=== Ninja ==="
-          ninja --version
-
-      - name: Inspect OpenEXR
-        run: |
-          echo "========================================"
-          echo "OPENEXR DIAGNOSTIC"
-          echo "========================================"
-
+          PYTHON_ROOT="$PWD/lib/macos_arm64/python"
+          FREETYPE_ROOT="$PWD/lib/ios_arm64/freetype"
           OPENEXR_ROOT="$PWD/lib/ios_arm64/openexr"
+          PNG_ROOT="$PWD/lib/ios_arm64/png"
+          JPEG_ROOT="$PWD/lib/ios_arm64/jpeg"
+          TIFF_ROOT="$PWD/lib/ios_arm64/tiff"
+          FMT_ROOT="$PWD/lib/ios_arm64/fmt"
 
-          echo ""
-          echo "=== OpenEXR root ==="
-          ls -la "$OPENEXR_ROOT"
-
-          echo ""
-          echo "=== OpenEXR directories ==="
-          find "$OPENEXR_ROOT" -type d -maxdepth 6 -print | sort
-
-          echo ""
-          echo "=== OpenEXR libraries ==="
-          find "$OPENEXR_ROOT" -type f \
-            \( -name "*.a" -o -name "*.dylib" -o -name "*.tbd" \) \
-            -print | sort
-
-          echo ""
-          echo "=== OpenEXR CMake/package files ==="
-          find "$OPENEXR_ROOT" -type f \
-            \( -name "*.cmake" -o -name "*.cps" \) \
-            -print | sort
-
-          echo ""
-          echo "=== OpenEXR headers ==="
-          find "$OPENEXR_ROOT/include" -type f | head -100
-
-      - name: Verify Dependencies
-        run: |
           echo "========================================"
           echo "VERIFYING DEPENDENCIES"
           echo "========================================"
 
-          PYTHON_ROOT="$PWD/lib/macos_arm64/python"
-
-          PYTHON_EXECUTABLE="$PYTHON_ROOT/bin/python3.13"
-          PYTHON_INCLUDE_DIR="$PYTHON_ROOT/include/python3.13"
-          PYTHON_LIBRARY="$PYTHON_ROOT/lib/libpython3.13.a"
-
-          FREETYPE_ROOT="$PWD/lib/ios_arm64/freetype"
-          FREETYPE_INCLUDE_DIR="$FREETYPE_ROOT/include/freetype2"
-          FREETYPE_LIBRARY="$FREETYPE_ROOT/lib/libfreetype.a"
-
-          OPENEXR_ROOT="$PWD/lib/ios_arm64/openexr"
-          OPENEXR_INCLUDE_DIR="$OPENEXR_ROOT/include"
-
-          PNG_ROOT="$PWD/lib/ios_arm64/png"
-          PNG_INCLUDE_DIR="$PNG_ROOT/include"
-          PNG_LIBRARY="$PNG_ROOT/lib/libpng16.a"
-
-          JPEG_ROOT="$PWD/lib/ios_arm64/jpeg"
-          JPEG_INCLUDE_DIR="$JPEG_ROOT/include"
-          JPEG_LIBRARY="$JPEG_ROOT/lib/libjpeg.a"
-
-          TIFF_ROOT="$PWD/lib/ios_arm64/tiff"
-          TIFF_INCLUDE_DIR="$TIFF_ROOT/include"
-          TIFF_LIBRARY="$TIFF_ROOT/lib/libtiff.a"
-
           echo ""
           echo "=== Python ==="
-          test -f "$PYTHON_EXECUTABLE" || { echo "ERROR: Python executable missing"; exit 1; }
-          test -f "$PYTHON_INCLUDE_DIR/Python.h" || { echo "ERROR: Python.h missing"; exit 1; }
-          test -f "$PYTHON_LIBRARY" || { echo "ERROR: Python library missing"; exit 1; }
-          echo "Python OK"
+          test -x "$PYTHON_ROOT/bin/python3.13"
+          test -f "$PYTHON_ROOT/include/python3.13/Python.h"
+          test -f "$PYTHON_ROOT/lib/libpython3.13.a"
+          echo "OK: Python"
 
           echo ""
           echo "=== FreeType ==="
-          test -f "$FREETYPE_INCLUDE_DIR/ft2build.h" || { echo "ERROR: FreeType headers missing"; exit 1; }
-          test -f "$FREETYPE_LIBRARY" || { echo "ERROR: FreeType library missing"; exit 1; }
-          echo "FreeType OK"
+          test -f "$FREETYPE_ROOT/include/freetype2/ft2build.h"
+          test -f "$FREETYPE_ROOT/lib/libfreetype.a"
+          echo "OK: FreeType"
 
           echo ""
           echo "=== OpenEXR ==="
-          test -d "$OPENEXR_INCLUDE_DIR/OpenEXR" || { echo "ERROR: OpenEXR headers missing"; exit 1; }
-          echo "OpenEXR headers OK"
+          test -d "$OPENEXR_ROOT"
+          test -d "$OPENEXR_ROOT/include/OpenEXR"
+          test -d "$OPENEXR_ROOT/lib/cmake/OpenEXR"
+          echo "OK: OpenEXR CMake directory"
+          echo "OpenEXR_DIR=$OPENEXR_ROOT/lib/cmake/OpenEXR"
 
           echo ""
           echo "=== PNG ==="
-          test -f "$PNG_INCLUDE_DIR/png.h" || { echo "ERROR: PNG headers missing"; exit 1; }
-          test -f "$PNG_LIBRARY" || { echo "ERROR: PNG library missing"; exit 1; }
-          echo "PNG OK"
+          test -f "$PNG_ROOT/include/png.h"
+          test -f "$PNG_ROOT/lib/libpng16.a"
+          echo "OK: PNG"
 
           echo ""
           echo "=== JPEG ==="
-          test -f "$JPEG_INCLUDE_DIR/jpeglib.h" || { echo "ERROR: JPEG headers missing"; exit 1; }
-          test -f "$JPEG_LIBRARY" || { echo "ERROR: JPEG library missing"; exit 1; }
-          echo "JPEG OK"
+          test -f "$JPEG_ROOT/include/jpeglib.h"
+          test -f "$JPEG_ROOT/lib/libjpeg.a"
+          echo "OK: JPEG"
 
           echo ""
           echo "=== TIFF ==="
-          test -f "$TIFF_INCLUDE_DIR/tiff.h" || { echo "ERROR: TIFF headers missing"; exit 1; }
-          test -f "$TIFF_LIBRARY" || { echo "ERROR: TIFF library missing"; exit 1; }
-          echo "TIFF OK"
+          test -f "$TIFF_ROOT/include/tiff.h"
+          test -f "$TIFF_ROOT/lib/libtiff.a"
+          echo "OK: TIFF"
 
           echo ""
-          echo "========================================"
-          echo "DEPENDENCY CHECKS PASSED"
-          echo "========================================"
+          echo "=== fmt ==="
+          if [ -d "$FMT_ROOT" ]; then
+            echo "fmt directory found:"
+            find "$FMT_ROOT" -maxdepth 4 -type f | head -50
+          else
+            echo "WARNING: fmt directory not found"
+          fi
+
+      - name: Show Apple Toolchain
+        run: |
+          xcodebuild -version
+          xcrun --sdk iphoneos --show-sdk-path
+          cmake --version
+          ninja --version
 
       - name: Configure iOS Build
         run: |
-          set -o pipefail
+          set -e
 
           PYTHON_ROOT="$PWD/lib/macos_arm64/python"
+          FREETYPE_ROOT="$PWD/lib/ios_arm64/freetype"
+          OPENEXR_ROOT="$PWD/lib/ios_arm64/openexr"
+          PNG_ROOT="$PWD/lib/ios_arm64/png"
+          JPEG_ROOT="$PWD/lib/ios_arm64/jpeg"
+          TIFF_ROOT="$PWD/lib/ios_arm64/tiff"
+          FMT_ROOT="$PWD/lib/ios_arm64/fmt"
 
           PYTHON_EXECUTABLE="$PYTHON_ROOT/bin/python3.13"
           PYTHON_INCLUDE_DIR="$PYTHON_ROOT/include/python3.13"
           PYTHON_LIBRARY="$PYTHON_ROOT/lib/libpython3.13.a"
           PYTHON_INCLUDE_CONFIG_DIR="$PYTHON_ROOT/lib/python3.13/config-3.13-darwin"
 
-          FREETYPE_ROOT="$PWD/lib/ios_arm64/freetype"
           FREETYPE_INCLUDE_DIR="$FREETYPE_ROOT/include/freetype2"
           FREETYPE_LIBRARY="$FREETYPE_ROOT/lib/libfreetype.a"
 
-          OPENEXR_ROOT="$PWD/lib/ios_arm64/openexr"
-          OPENEXR_INCLUDE_DIR="$OPENEXR_ROOT/include"
-
-          PNG_ROOT="$PWD/lib/ios_arm64/png"
           PNG_INCLUDE_DIR="$PNG_ROOT/include"
           PNG_LIBRARY="$PNG_ROOT/lib/libpng16.a"
 
-          JPEG_ROOT="$PWD/lib/ios_arm64/jpeg"
           JPEG_INCLUDE_DIR="$JPEG_ROOT/include"
           JPEG_LIBRARY="$JPEG_ROOT/lib/libjpeg.a"
 
-          TIFF_ROOT="$PWD/lib/ios_arm64/tiff"
           TIFF_INCLUDE_DIR="$TIFF_ROOT/include"
           TIFF_LIBRARY="$TIFF_ROOT/lib/libtiff.a"
 
+          OPENEXR_CMAKE_DIR="$OPENEXR_ROOT/lib/cmake/OpenEXR"
+
           echo "========================================"
-          echo "CONFIGURING BLENDER FOR iOS"
+          echo "BUILD CONFIGURATION"
           echo "========================================"
+
+          echo ""
+          echo "=== Python ==="
+          echo "$PYTHON_EXECUTABLE"
+          echo "$PYTHON_INCLUDE_DIR"
+          echo "$PYTHON_LIBRARY"
+
+          echo ""
+          echo "=== FreeType ==="
+          echo "$FREETYPE_INCLUDE_DIR"
+          echo "$FREETYPE_LIBRARY"
+
+          echo ""
+          echo "=== OpenEXR ==="
+          echo "$OPENEXR_CMAKE_DIR"
+
+          echo ""
+          echo "=== PNG ==="
+          echo "$PNG_INCLUDE_DIR"
+          echo "$PNG_LIBRARY"
+
+          echo ""
+          echo "=== JPEG ==="
+          echo "$JPEG_INCLUDE_DIR"
+          echo "$JPEG_LIBRARY"
+
+          echo ""
+          echo "=== TIFF ==="
+          echo "$TIFF_INCLUDE_DIR"
+          echo "$TIFF_LIBRARY"
+
+          "$PYTHON_EXECUTABLE" --version
 
           rm -rf build_ios
 
@@ -210,7 +189,10 @@ jobs:
             -DCMAKE_OSX_SYSROOT=iphoneos \
             -DCMAKE_OSX_ARCHITECTURES=arm64 \
             -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_PREFIX_PATH="$PWD/lib/ios_arm64" \
+            -DCMAKE_PREFIX_PATH="$OPENEXR_CMAKE_DIR;$FMT_ROOT" \
+            -DOpenEXR_DIR="$OPENEXR_CMAKE_DIR" \
+            -DOPENEXR_ROOT="$OPENEXR_ROOT" \
+            -DOPENEXR_INCLUDE_DIR="$OPENEXR_ROOT/include" \
             -DPYTHON_VERSION=3.13 \
             -DPYTHON_EXECUTABLE="$PYTHON_EXECUTABLE" \
             -DPYTHON_INCLUDE_DIR="$PYTHON_INCLUDE_DIR" \
@@ -223,24 +205,17 @@ jobs:
             -DJPEG_INCLUDE_DIR="$JPEG_INCLUDE_DIR" \
             -DJPEG_LIBRARY="$JPEG_LIBRARY" \
             -DTIFF_INCLUDE_DIR="$TIFF_INCLUDE_DIR" \
-            -DTIFF_LIBRARY="$TIFF_LIBRARY" \
-            2>&1 | tee cmake-configure.log
-
-      - name: Upload Configure Log
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: cmake-configure-log
-          path: cmake-configure.log
-          if-no-files-found: ignore
+            -DTIFF_LIBRARY="$TIFF_LIBRARY"
 
       - name: Build Blender
         run: |
+          set -e
+
           cmake --build build_ios \
             --config Release \
-            --parallel $(sysctl -n hw.ncpu)
+            --parallel "$(sysctl -n hw.ncpu)"
 
-      - name: Find Blender.app
+      - name: Find Blender App
         run: |
           echo "Searching for Blender.app..."
 
@@ -251,6 +226,8 @@ jobs:
 
       - name: Package Unsigned IPA
         run: |
+          set -e
+
           APP="$(find build_ios -type d -name "Blender.app" -print -quit)"
 
           if [ -z "$APP" ]; then
