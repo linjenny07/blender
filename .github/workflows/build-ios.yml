@@ -51,173 +51,64 @@ jobs:
           cmake --version
           ninja --version
 
-      - name: Inspect PNG
+      - name: Inspect required iOS libraries
         run: |
           echo "========================================"
-          echo "PNG DIAGNOSTIC"
+          echo "CHECKING iOS LIBRARIES"
           echo "========================================"
 
           echo ""
-          echo "=== PNG directory ==="
-          ls -la lib/ios_arm64/png
+          echo "=== PNG ==="
+          ls -la lib/ios_arm64/png/include
+          ls -la lib/ios_arm64/png/lib
+
+          echo ""
+          echo "=== JPEG ==="
+          ls -la lib/ios_arm64/jpeg/include 2>/dev/null || true
+          ls -la lib/ios_arm64/jpeg/lib 2>/dev/null || true
+
+          echo ""
+          echo "=== OpenEXR ==="
+          ls -la lib/ios_arm64/openexr/include/OpenEXR 2>/dev/null | head -30 || true
+          ls -la lib/ios_arm64/openexr/lib 2>/dev/null || true
+
+          echo ""
+          echo "=== FreeType ==="
+          ls -la lib/ios_arm64/freetype/include/freetype2
+          ls -la lib/ios_arm64/freetype/lib
+
+      - name: Locate iOS library files
+        run: |
+          echo "========================================"
+          echo "LIBRARY FILE SEARCH"
+          echo "========================================"
+
+          echo ""
+          echo "=== JPEG files ==="
+          find "$PWD/lib/ios_arm64" -type f \
+            \( -name "jpeglib.h" -o -name "libjpeg.a" -o -name "libjpeg.dylib" \) \
+            -print || true
 
           echo ""
           echo "=== PNG files ==="
-          find lib/ios_arm64/png -type f -print | sort
-
-      - name: Inspect OpenEXR
-        run: |
-          echo "========================================"
-          echo "OPENEXR DIAGNOSTIC"
-          echo "========================================"
+          find "$PWD/lib/ios_arm64" -type f \
+            \( -name "png.h" -o -name "libpng.a" -o -name "libpng16.a" \) \
+            -print || true
 
           echo ""
-          echo "=== OpenEXR directory ==="
-          ls -la lib/ios_arm64/openexr
-
-          echo ""
-          echo "=== OpenEXR files ==="
-          find lib/ios_arm64/openexr -type f -print | sort
+          echo "=== OpenEXR CMake/package files ==="
+          find "$PWD/lib/ios_arm64/openexr" -type f \
+            \( -name "*.cmake" \
+            -o -name "*.cps" \
+            -o -name "*Config.cmake" \
+            -o -name "*config.cmake" \) \
+            -print || true
 
           echo ""
           echo "=== OpenEXR libraries ==="
-          find lib/ios_arm64/openexr/lib -type f -print | sort
-
-          echo ""
-          echo "=== OpenEXR package files ==="
-          find lib/ios_arm64/openexr \
-            \( -name "*.cmake" -o -name "*.cps" -o -name "*Config*" -o -name "*config*" \) \
-            -print | sort
-
-      - name: Create missing CMake package files
-        run: |
-          echo "Creating CMake package files for bundled iOS libraries..."
-
-          mkdir -p lib/ios_arm64/openexr/lib/cmake/OpenEXR
-          mkdir -p lib/ios_arm64/png/lib/cmake/PNG
-
-          cat > lib/ios_arm64/openexr/lib/cmake/OpenEXR/OpenEXRConfig.cmake <<'EOF'
-          set(OpenEXR_FOUND TRUE)
-
-          set(OpenEXR_INCLUDE_DIR
-              "${CMAKE_CURRENT_LIST_DIR}/../../../include")
-
-          set(OpenEXR_INCLUDE_DIRS
-              "${CMAKE_CURRENT_LIST_DIR}/../../../include"
-              "${CMAKE_CURRENT_LIST_DIR}/../../../include/OpenEXR")
-
-          set(OPENEXR_INCLUDE_DIR
-              "${CMAKE_CURRENT_LIST_DIR}/../../../include")
-
-          set(OPENEXR_INCLUDE_DIRS
-              "${CMAKE_CURRENT_LIST_DIR}/../../../include"
-              "${CMAKE_CURRENT_LIST_DIR}/../../../include/OpenEXR")
-
-          set(OpenEXR_LIBRARIES
-              "${CMAKE_CURRENT_LIST_DIR}/../../libOpenEXR.dylib"
-              "${CMAKE_CURRENT_LIST_DIR}/../../libOpenEXRCore.dylib"
-              "${CMAKE_CURRENT_LIST_DIR}/../../libOpenEXRUtil.dylib"
-              "${CMAKE_CURRENT_LIST_DIR}/../../libIex.dylib"
-              "${CMAKE_CURRENT_LIST_DIR}/../../libIlmThread.dylib")
-
-          set(OPENEXR_LIBRARIES "${OpenEXR_LIBRARIES}")
-
-          if(NOT TARGET OpenEXR::OpenEXR)
-            add_library(OpenEXR::OpenEXR SHARED IMPORTED)
-            set_target_properties(OpenEXR::OpenEXR PROPERTIES
-              IMPORTED_LOCATION
-                "${CMAKE_CURRENT_LIST_DIR}/../../libOpenEXR.dylib"
-              INTERFACE_INCLUDE_DIRECTORIES
-                "${CMAKE_CURRENT_LIST_DIR}/../../../include"
-            )
-          endif()
-
-          if(NOT TARGET OpenEXR::OpenEXRCore)
-            add_library(OpenEXR::OpenEXRCore SHARED IMPORTED)
-            set_target_properties(OpenEXR::OpenEXRCore PROPERTIES
-              IMPORTED_LOCATION
-                "${CMAKE_CURRENT_LIST_DIR}/../../libOpenEXRCore.dylib"
-              INTERFACE_INCLUDE_DIRECTORIES
-                "${CMAKE_CURRENT_LIST_DIR}/../../../include"
-            )
-          endif()
-
-          if(NOT TARGET OpenEXR::OpenEXRUtil)
-            add_library(OpenEXR::OpenEXRUtil SHARED IMPORTED)
-            set_target_properties(OpenEXR::OpenEXRUtil PROPERTIES
-              IMPORTED_LOCATION
-                "${CMAKE_CURRENT_LIST_DIR}/../../libOpenEXRUtil.dylib"
-              INTERFACE_INCLUDE_DIRECTORIES
-                "${CMAKE_CURRENT_LIST_DIR}/../../../include"
-            )
-          endif()
-
-          if(NOT TARGET Iex::Iex)
-            add_library(Iex::Iex SHARED IMPORTED)
-            set_target_properties(Iex::Iex PROPERTIES
-              IMPORTED_LOCATION
-                "${CMAKE_CURRENT_LIST_DIR}/../../libIex.dylib"
-              INTERFACE_INCLUDE_DIRECTORIES
-                "${CMAKE_CURRENT_LIST_DIR}/../../../include"
-            )
-          endif()
-
-          if(NOT TARGET IlmThread::IlmThread)
-            add_library(IlmThread::IlmThread SHARED IMPORTED)
-            set_target_properties(IlmThread::IlmThread PROPERTIES
-              IMPORTED_LOCATION
-                "${CMAKE_CURRENT_LIST_DIR}/../../libIlmThread.dylib"
-              INTERFACE_INCLUDE_DIRECTORIES
-                "${CMAKE_CURRENT_LIST_DIR}/../../../include"
-            )
-          endif()
-          EOF
-
-          cat > lib/ios_arm64/openexr/lib/cmake/OpenEXR/OpenEXRConfigVersion.cmake <<'EOF'
-          set(PACKAGE_VERSION "3.0.0")
-          set(PACKAGE_VERSION_COMPATIBLE TRUE)
-          set(PACKAGE_VERSION_EXACT TRUE)
-          EOF
-
-          cat > lib/ios_arm64/png/lib/cmake/PNG/PNGConfig.cmake <<'EOF'
-          set(PNG_FOUND TRUE)
-
-          set(PNG_INCLUDE_DIR
-              "${CMAKE_CURRENT_LIST_DIR}/../../../include")
-
-          set(PNG_INCLUDE_DIRS
-              "${CMAKE_CURRENT_LIST_DIR}/../../../include"
-              "${CMAKE_CURRENT_LIST_DIR}/../../../include/libpng16")
-
-          set(PNG_LIBRARY
-              "${CMAKE_CURRENT_LIST_DIR}/../../libpng16.a")
-
-          set(PNG_LIBRARIES "${PNG_LIBRARY}")
-
-          if(NOT TARGET PNG::PNG)
-            add_library(PNG::PNG STATIC IMPORTED)
-            set_target_properties(PNG::PNG PROPERTIES
-              IMPORTED_LOCATION
-                "${CMAKE_CURRENT_LIST_DIR}/../../libpng16.a"
-              INTERFACE_INCLUDE_DIRECTORIES
-                "${CMAKE_CURRENT_LIST_DIR}/../../../include"
-            )
-          endif()
-          EOF
-
-          cat > lib/ios_arm64/png/lib/cmake/PNG/PNGConfigVersion.cmake <<'EOF'
-          set(PACKAGE_VERSION "1.6.0")
-          set(PACKAGE_VERSION_COMPATIBLE TRUE)
-          set(PACKAGE_VERSION_EXACT TRUE)
-          EOF
-
-          echo ""
-          echo "=== Created OpenEXR config ==="
-          cat lib/ios_arm64/openexr/lib/cmake/OpenEXR/OpenEXRConfig.cmake
-
-          echo ""
-          echo "=== Created PNG config ==="
-          cat lib/ios_arm64/png/lib/cmake/PNG/PNGConfig.cmake
+          find "$PWD/lib/ios_arm64/openexr" -type f \
+            \( -name "*.a" -o -name "*.dylib" \) \
+            -print || true
 
       - name: Inspect macOS Python
         run: |
@@ -281,45 +172,60 @@ jobs:
           PNG_INCLUDE_DIR="$PNG_ROOT/include"
           PNG_LIBRARY="$PNG_ROOT/lib/libpng16.a"
 
+          JPEG_ROOT="$PWD/lib/ios_arm64/jpeg"
+          JPEG_INCLUDE_DIR="$JPEG_ROOT/include"
+          JPEG_LIBRARY="$JPEG_ROOT/lib/libjpeg.a"
+
           OPENEXR_ROOT="$PWD/lib/ios_arm64/openexr"
           OPENEXR_INCLUDE_DIR="$OPENEXR_ROOT/include"
-          OPENEXR_LIBRARY="$OPENEXR_ROOT/lib/libOpenEXR.dylib"
+          OPENEXR_LIBRARY_DIR="$OPENEXR_ROOT/lib"
 
-          echo "=== Python configuration ==="
-          echo "Executable: $PYTHON_EXECUTABLE"
-          echo "Include:    $PYTHON_INCLUDE_DIR"
-          echo "Library:    $PYTHON_LIBRARY"
-          echo "Config:     $PYTHON_INCLUDE_CONFIG_DIR"
+          echo "========================================"
+          echo "BUILD CONFIGURATION"
+          echo "========================================"
 
-          echo "=== FreeType configuration ==="
-          echo "Include:    $FREETYPE_INCLUDE_DIR"
-          echo "Library:    $FREETYPE_LIBRARY"
+          echo ""
+          echo "=== Python ==="
+          echo "$PYTHON_EXECUTABLE"
+          echo "$PYTHON_INCLUDE_DIR"
+          echo "$PYTHON_LIBRARY"
 
-          echo "=== PNG configuration ==="
-          echo "Include:    $PNG_INCLUDE_DIR"
-          echo "Library:    $PNG_LIBRARY"
+          echo ""
+          echo "=== FreeType ==="
+          echo "$FREETYPE_INCLUDE_DIR"
+          echo "$FREETYPE_LIBRARY"
 
-          echo "=== OpenEXR configuration ==="
-          echo "Include:    $OPENEXR_INCLUDE_DIR"
-          echo "Library:    $OPENEXR_LIBRARY"
+          echo ""
+          echo "=== PNG ==="
+          echo "$PNG_INCLUDE_DIR"
+          echo "$PNG_LIBRARY"
+
+          echo ""
+          echo "=== JPEG ==="
+          echo "$JPEG_INCLUDE_DIR"
+          echo "$JPEG_LIBRARY"
+
+          echo ""
+          echo "=== OpenEXR ==="
+          echo "$OPENEXR_ROOT"
+
+          echo ""
+          echo "========================================"
+          echo "VERIFYING FILES"
+          echo "========================================"
 
           test -f "$PYTHON_EXECUTABLE"
           test -f "$PYTHON_INCLUDE_DIR/Python.h"
           test -f "$PYTHON_LIBRARY"
-          test -d "$PYTHON_INCLUDE_CONFIG_DIR"
 
           test -f "$FREETYPE_INCLUDE_DIR/ft2build.h"
           test -f "$FREETYPE_LIBRARY"
 
-          test -f "$PNG_ROOT/include/png.h"
+          test -f "$PNG_INCLUDE_DIR/png.h"
           test -f "$PNG_LIBRARY"
 
-          test -f "$OPENEXR_ROOT/include/OpenEXR/ImfHeader.h"
-          test -f "$OPENEXR_ROOT/lib/libOpenEXR.dylib"
-          test -f "$OPENEXR_ROOT/lib/libOpenEXRCore.dylib"
-          test -f "$OPENEXR_ROOT/lib/libOpenEXRUtil.dylib"
-          test -f "$OPENEXR_ROOT/lib/libIex.dylib"
-          test -f "$OPENEXR_ROOT/lib/libIlmThread.dylib"
+          test -f "$JPEG_INCLUDE_DIR/jpeglib.h"
+          test -f "$JPEG_LIBRARY"
 
           "$PYTHON_EXECUTABLE" --version
 
@@ -331,35 +237,36 @@ jobs:
             -DCMAKE_OSX_SYSROOT=iphoneos \
             -DCMAKE_OSX_ARCHITECTURES=arm64 \
             -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_PREFIX_PATH="$OPENEXR_ROOT;$PNG_ROOT" \
-            -DOpenEXR_DIR="$OPENEXR_ROOT/lib/cmake/OpenEXR" \
-            -DPNG_DIR="$PNG_ROOT/lib/cmake/PNG" \
-            -DOpenEXR_ROOT="$OPENEXR_ROOT" \
-            -DPNG_ROOT="$PNG_ROOT" \
-            -DOpenEXR_INCLUDE_DIR="$OPENEXR_INCLUDE_DIR" \
-            -DOPENEXR_INCLUDE_DIR="$OPENEXR_INCLUDE_DIR" \
-            -DOPENEXR_INCLUDE_DIRS="$OPENEXR_INCLUDE_DIR" \
-            -DOPENEXR_LIBRARIES="$OPENEXR_ROOT/lib/libOpenEXR.dylib;$OPENEXR_ROOT/lib/libOpenEXRCore.dylib;$OPENEXR_ROOT/lib/libOpenEXRUtil.dylib;$OPENEXR_ROOT/lib/libIex.dylib;$OPENEXR_ROOT/lib/libIlmThread.dylib" \
-            -DPNG_INCLUDE_DIR="$PNG_INCLUDE_DIR" \
-            -DPNG_PNG_INCLUDE_DIR="$PNG_INCLUDE_DIR" \
-            -DPNG_LIBRARY="$PNG_LIBRARY" \
-            -DPNG_LIBRARIES="$PNG_LIBRARY" \
+            -DCMAKE_PREFIX_PATH="$PWD/lib/ios_arm64" \
             -DPYTHON_VERSION=3.13 \
             -DPYTHON_EXECUTABLE="$PYTHON_EXECUTABLE" \
             -DPYTHON_INCLUDE_DIR="$PYTHON_INCLUDE_DIR" \
             -DPYTHON_LIBRARY="$PYTHON_LIBRARY" \
             -DPYTHON_INCLUDE_CONFIG_DIR="$PYTHON_INCLUDE_CONFIG_DIR" \
             -DFREETYPE_INCLUDE_DIRS="$FREETYPE_INCLUDE_DIR" \
-            -DFREETYPE_LIBRARY="$FREETYPE_LIBRARY"
+            -DFREETYPE_LIBRARY="$FREETYPE_LIBRARY" \
+            -DPNG_PNG_INCLUDE_DIR="$PNG_INCLUDE_DIR" \
+            -DPNG_LIBRARY="$PNG_LIBRARY" \
+            -DJPEG_INCLUDE_DIR="$JPEG_INCLUDE_DIR" \
+            -DJPEG_LIBRARY="$JPEG_LIBRARY" \
+            -DOPENEXR_ROOT="$OPENEXR_ROOT" \
+            -DCMAKE_LIBRARY_PATH="$PWD/lib/ios_arm64/png/lib;$PWD/lib/ios_arm64/jpeg/lib;$PWD/lib/ios_arm64/openexr/lib" \
+            -DCMAKE_INCLUDE_PATH="$PWD/lib/ios_arm64/png/include;$PWD/lib/ios_arm64/jpeg/include;$PWD/lib/ios_arm64/openexr/include"
 
-      - name: Show CMake OpenEXR and PNG results
+      - name: Show CMake cache
+        if: always()
         run: |
-          echo "=== OpenEXR CMake result ==="
-          grep -i "openexr" build_ios/CMakeCache.txt | head -50 || true
+          echo "========================================"
+          echo "CMAKE CACHE"
+          echo "========================================"
 
-          echo ""
-          echo "=== PNG CMake result ==="
-          grep -i "png" build_ios/CMakeCache.txt | head -50 || true
+          if [ -f build_ios/CMakeCache.txt ]; then
+            grep -E \
+              "PNG_|JPEG_|OPENEXR|FREETYPE|PYTHON" \
+              build_ios/CMakeCache.txt || true
+          else
+            echo "CMakeCache.txt does not exist."
+          fi
 
       - name: Build Blender
         run: |
@@ -381,10 +288,17 @@ jobs:
             exit 1
           fi
 
+          rm -rf Payload
           mkdir -p Payload
+
           cp -R "$APP" Payload/Blender.app
-          /usr/bin/ditto -c -k --sequesterRsrc --keepParent \
-            Payload Blender-iPad-unsigned.ipa
+
+          /usr/bin/ditto \
+            -c -k \
+            --sequesterRsrc \
+            --keepParent \
+            Payload \
+            Blender-iPad-unsigned.ipa
 
       - name: Upload IPA
         uses: actions/upload-artifact@v4
