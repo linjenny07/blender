@@ -51,7 +51,7 @@ jobs:
           cmake --version
           ninja --version
 
-      - name: Inspect required iOS libraries
+      - name: Diagnose iOS libraries
         run: |
           echo "========================================"
           echo "CHECKING iOS LIBRARIES"
@@ -59,56 +59,71 @@ jobs:
 
           echo ""
           echo "=== PNG ==="
-          ls -la lib/ios_arm64/png/include
-          ls -la lib/ios_arm64/png/lib
+          find "$PWD/lib/ios_arm64/png" -type f \
+            \( -name "png.h" -o -name "libpng*.a" \) \
+            -print || true
 
           echo ""
           echo "=== JPEG ==="
-          ls -la lib/ios_arm64/jpeg/include 2>/dev/null || true
-          ls -la lib/ios_arm64/jpeg/lib 2>/dev/null || true
+          find "$PWD/lib/ios_arm64" -type f \
+            \( -name "jpeglib.h" -o -name "libjpeg*.a" \) \
+            -print || true
 
           echo ""
           echo "=== OpenEXR ==="
-          ls -la lib/ios_arm64/openexr/include/OpenEXR 2>/dev/null | head -30 || true
-          ls -la lib/ios_arm64/openexr/lib 2>/dev/null || true
+          find "$PWD/lib/ios_arm64/openexr" -maxdepth 3 -type f \
+            \( -name "*.a" -o -name "*.dylib" -o -name "*.cmake" -o -name "*.cps" \) \
+            -print || true
 
-          echo ""
-          echo "=== FreeType ==="
-          ls -la lib/ios_arm64/freetype/include/freetype2
-          ls -la lib/ios_arm64/freetype/lib
-
-      - name: Locate iOS library files
+      - name: Create OpenEXR CMake package
         run: |
           echo "========================================"
-          echo "LIBRARY FILE SEARCH"
+          echo "CREATING OPENEXR CMAKE PACKAGE"
           echo "========================================"
 
-          echo ""
-          echo "=== JPEG files ==="
-          find "$PWD/lib/ios_arm64" -type f \
-            \( -name "jpeglib.h" -o -name "libjpeg.a" -o -name "libjpeg.dylib" \) \
-            -print || true
+          OPENEXR_ROOT="$PWD/lib/ios_arm64/openexr"
+          OPENEXR_CMAKE="$OPENEXR_ROOT/lib/cmake/OpenEXR"
+
+          mkdir -p "$OPENEXR_CMAKE"
+
+          cat > "$OPENEXR_CMAKE/OpenEXRConfig.cmake" << EOF
+          set(OpenEXR_FOUND TRUE)
+
+          set(OpenEXR_INCLUDE_DIR "$OPENEXR_ROOT/include")
+          set(OpenEXR_INCLUDE_DIRS "$OPENEXR_ROOT/include")
+
+          set(OpenEXR_LIBRARY_DIR "$OPENEXR_ROOT/lib")
+
+          set(OpenEXR_LIBRARIES
+            "$OPENEXR_ROOT/lib/libOpenEXR.dylib"
+            "$OPENEXR_ROOT/lib/libOpenEXRCore.dylib"
+            "$OPENEXR_ROOT/lib/libOpenEXRUtil.dylib"
+            "$OPENEXR_ROOT/lib/libIex.dylib"
+            "$OPENEXR_ROOT/lib/libIlmThread.dylib"
+          )
+
+          set(OpenEXR_VERSION "3.3.0")
+          EOF
+
+          cat > "$OPENEXR_CMAKE/OpenEXRConfigVersion.cmake" << EOF
+          set(PACKAGE_VERSION "3.3.0")
+
+          if(PACKAGE_FIND_VERSION VERSION_LESS_EQUAL PACKAGE_VERSION)
+            set(PACKAGE_VERSION_COMPATIBLE TRUE)
+          endif()
+
+          if(PACKAGE_FIND_VERSION STREQUAL PACKAGE_VERSION)
+            set(PACKAGE_VERSION_EXACT TRUE)
+          endif()
+          EOF
 
           echo ""
-          echo "=== PNG files ==="
-          find "$PWD/lib/ios_arm64" -type f \
-            \( -name "png.h" -o -name "libpng.a" -o -name "libpng16.a" \) \
-            -print || true
+          echo "=== Generated OpenEXRConfig.cmake ==="
+          cat "$OPENEXR_CMAKE/OpenEXRConfig.cmake"
 
           echo ""
-          echo "=== OpenEXR CMake/package files ==="
-          find "$PWD/lib/ios_arm64/openexr" -type f \
-            \( -name "*.cmake" \
-            -o -name "*.cps" \
-            -o -name "*Config.cmake" \
-            -o -name "*config.cmake" \) \
-            -print || true
-
-          echo ""
-          echo "=== OpenEXR libraries ==="
-          find "$PWD/lib/ios_arm64/openexr" -type f \
-            \( -name "*.a" -o -name "*.dylib" \) \
-            -print || true
+          echo "=== Generated files ==="
+          find "$OPENEXR_CMAKE" -type f -print
 
       - name: Inspect macOS Python
         run: |
@@ -147,7 +162,7 @@ jobs:
             -print || true
 
           echo ""
-          echo "=== Python executable information ==="
+          echo "=== Python executable ==="
           if [ -f "lib/macos_arm64/python/bin/python3.13" ]; then
             file lib/macos_arm64/python/bin/python3.13
             lib/macos_arm64/python/bin/python3.13 --version
@@ -177,41 +192,41 @@ jobs:
           JPEG_LIBRARY="$JPEG_ROOT/lib/libjpeg.a"
 
           OPENEXR_ROOT="$PWD/lib/ios_arm64/openexr"
-          OPENEXR_INCLUDE_DIR="$OPENEXR_ROOT/include"
-          OPENEXR_LIBRARY_DIR="$OPENEXR_ROOT/lib"
+          OPENEXR_CMAKE="$OPENEXR_ROOT/lib/cmake/OpenEXR"
 
           echo "========================================"
           echo "BUILD CONFIGURATION"
           echo "========================================"
 
           echo ""
-          echo "=== Python ==="
+          echo "Python:"
           echo "$PYTHON_EXECUTABLE"
           echo "$PYTHON_INCLUDE_DIR"
           echo "$PYTHON_LIBRARY"
 
           echo ""
-          echo "=== FreeType ==="
+          echo "FreeType:"
           echo "$FREETYPE_INCLUDE_DIR"
           echo "$FREETYPE_LIBRARY"
 
           echo ""
-          echo "=== PNG ==="
+          echo "PNG:"
           echo "$PNG_INCLUDE_DIR"
           echo "$PNG_LIBRARY"
 
           echo ""
-          echo "=== JPEG ==="
+          echo "JPEG:"
           echo "$JPEG_INCLUDE_DIR"
           echo "$JPEG_LIBRARY"
 
           echo ""
-          echo "=== OpenEXR ==="
+          echo "OpenEXR:"
           echo "$OPENEXR_ROOT"
+          echo "$OPENEXR_CMAKE"
 
           echo ""
           echo "========================================"
-          echo "VERIFYING FILES"
+          echo "VERIFYING REQUIRED FILES"
           echo "========================================"
 
           test -f "$PYTHON_EXECUTABLE"
@@ -227,6 +242,8 @@ jobs:
           test -f "$JPEG_INCLUDE_DIR/jpeglib.h"
           test -f "$JPEG_LIBRARY"
 
+          test -f "$OPENEXR_CMAKE/OpenEXRConfig.cmake"
+
           "$PYTHON_EXECUTABLE" --version
 
           rm -rf build_ios
@@ -237,7 +254,12 @@ jobs:
             -DCMAKE_OSX_SYSROOT=iphoneos \
             -DCMAKE_OSX_ARCHITECTURES=arm64 \
             -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_PREFIX_PATH="$PWD/lib/ios_arm64" \
+            -DCMAKE_PREFIX_PATH="$PWD/lib/ios_arm64;$OPENEXR_ROOT" \
+            -DOpenEXR_DIR="$OPENEXR_CMAKE" \
+            -DOPENEXR_ROOT="$OPENEXR_ROOT" \
+            -DOPENEXR_INCLUDE_DIR="$OPENEXR_ROOT/include" \
+            -DOPENEXR_INCLUDE_DIRS="$OPENEXR_ROOT/include" \
+            -DOPENEXR_LIBRARY_DIR="$OPENEXR_ROOT/lib" \
             -DPYTHON_VERSION=3.13 \
             -DPYTHON_EXECUTABLE="$PYTHON_EXECUTABLE" \
             -DPYTHON_INCLUDE_DIR="$PYTHON_INCLUDE_DIR" \
@@ -249,7 +271,6 @@ jobs:
             -DPNG_LIBRARY="$PNG_LIBRARY" \
             -DJPEG_INCLUDE_DIR="$JPEG_INCLUDE_DIR" \
             -DJPEG_LIBRARY="$JPEG_LIBRARY" \
-            -DOPENEXR_ROOT="$OPENEXR_ROOT" \
             -DCMAKE_LIBRARY_PATH="$PWD/lib/ios_arm64/png/lib;$PWD/lib/ios_arm64/jpeg/lib;$PWD/lib/ios_arm64/openexr/lib" \
             -DCMAKE_INCLUDE_PATH="$PWD/lib/ios_arm64/png/include;$PWD/lib/ios_arm64/jpeg/include;$PWD/lib/ios_arm64/openexr/include"
 
@@ -262,7 +283,7 @@ jobs:
 
           if [ -f build_ios/CMakeCache.txt ]; then
             grep -E \
-              "PNG_|JPEG_|OPENEXR|FREETYPE|PYTHON" \
+              "PNG_|JPEG_|OPENEXR|OpenEXR|FREETYPE|PYTHON" \
               build_ios/CMakeCache.txt || true
           else
             echo "CMakeCache.txt does not exist."
@@ -305,3 +326,4 @@ jobs:
         with:
           name: Blender-iPad-unsigned
           path: Blender-iPad-unsigned.ipa
+```
