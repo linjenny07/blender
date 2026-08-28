@@ -1,278 +1,259 @@
-name: Build Blender iPad
+name: Compile Latest Blender iPad App
 
 on:
-  workflow_dispatch:
   push:
+  workflow_dispatch:
 
 jobs:
   build-ios:
-    runs-on: macos-26
+    runs-on: macos-14
 
     steps:
-    - name: Checkout iOS branch
-      uses: actions/checkout@v4
-      env:
-        GIT_LFS_SKIP_SMUDGE: "1"
-      with:
-        repository: linjenny07/blender
-        ref: ios
-        submodules: recursive
-        lfs: false
+      - name: Checkout Blender Source
+        uses: actions/checkout@v4
+        env:
+          GIT_LFS_SKIP_SMUDGE: "1"
+        with:
+          repository: linjenny07/blender
+          ref: ios
+          submodules: recursive
+          lfs: false
 
-    - name: Fetch Blender LFS data
-      run: |
-        git lfs install --local
-        ./build_files/utils/make_update.py --no-libraries
+      - name: Fetch Blender LFS data
+        run: |
+          git lfs install --local
+          ./build_files/utils/make_update.py --no-libraries
 
-    - name: Fetch iOS libraries
-      run: |
-        rm -rf lib/ios_arm64
-        git clone https://projects.blender.org/blender/lib-ios_arm64.git lib/ios_arm64
-        cd lib/ios_arm64
-        git checkout 393201c7c8525941553f6a96e19b909d6b3bfc4f
+      - name: Fetch iOS Libraries
+        run: |
+          rm -rf lib/ios_arm64
+          git clone https://projects.blender.org/blender/lib-ios_arm64.git lib/ios_arm64
+          cd lib/ios_arm64
+          git checkout 393201c7c8525941553f6a96e19b909d6b3bfc4f
 
-    - name: Fetch macOS ARM64 libraries
-      run: |
-        rm -rf lib/macos_arm64
-        git clone https://projects.blender.org/blender/lib-macos_arm64.git lib/macos_arm64
-        cd lib/macos_arm64
-        git checkout a241b11
-        git lfs install
-        git lfs pull
+      - name: Fetch macOS ARM64 Libraries
+        run: |
+          rm -rf lib/macos_arm64
+          git clone https://projects.blender.org/blender/lib-macos_arm64.git lib/macos_arm64
+          cd lib/macos_arm64
+          git checkout a241b11
+          git lfs install
+          git lfs pull
 
-    - name: Install build tools
-      run: |
-        brew install cmake ninja
+      - name: Install Development Tools
+        run: |
+          brew install cmake ninja
 
-    - name: Show Apple toolchain
-      run: |
-        xcodebuild -version
-        xcrun --sdk iphoneos --show-sdk-path
-        cmake --version
-        ninja --version
+      - name: Setup macOS Environment Paths
+        run: |
+          echo "/opt/homebrew/bin" >> $GITHUB_PATH
 
-    - name: Verify required libraries
-      run: |
-        set -e
+      - name: Show Apple Toolchain
+        run: |
+          xcodebuild -version
+          xcrun --sdk iphoneos --show-sdk-path
+          cmake --version
+          ninja --version
 
-        echo "========================================"
-        echo "VERIFYING IOS LIBRARIES"
-        echo "========================================"
+      - name: Verify Required Libraries
+        run: |
+          echo "=== iOS libraries ==="
+          ls -la lib/ios_arm64
 
-        echo ""
-        echo "=== OpenEXR ==="
-        test -d lib/ios_arm64/openexr
-        find lib/ios_arm64/openexr -maxdepth 3 -type f | sort | head -100
+          echo ""
+          echo "=== OpenEXR ==="
+          find "$PWD/lib/ios_arm64/openexr" -maxdepth 4 -type f -print | sort
 
-        echo ""
-        echo "=== PNG ==="
-        test -f lib/ios_arm64/png/lib/libpng16.a
-        test -f lib/ios_arm64/png/include/png.h
-        echo "PNG OK"
+          echo ""
+          echo "=== PNG ==="
+          find "$PWD/lib/ios_arm64/png" -maxdepth 4 -type f -print | sort
 
-        echo ""
-        echo "=== JPEG ==="
-        test -f lib/ios_arm64/jpeg/lib/libjpeg.a
-        test -f lib/ios_arm64/jpeg/include/jpeglib.h
-        echo "JPEG OK"
+          echo ""
+          echo "=== JPEG ==="
+          find "$PWD/lib/ios_arm64/jpeg" -maxdepth 4 -type f -print | sort
 
-        echo ""
-        echo "=== TIFF ==="
-        test -f lib/ios_arm64/tiff/lib/libtiff.a
-        echo "TIFF OK"
+          echo ""
+          echo "=== TIFF ==="
+          find "$PWD/lib/ios_arm64/tiff" -maxdepth 4 -type f -print | sort
 
-        echo ""
-        echo "=== FreeType ==="
-        test -f lib/ios_arm64/freetype/lib/libfreetype.a
-        echo "FreeType OK"
+      - name: Create OpenEXR CMake Package
+        run: |
+          OPENEXR_ROOT="$PWD/lib/ios_arm64/openexr"
 
-        echo ""
-        echo "=== Python ==="
-        test -f lib/macos_arm64/python/bin/python3.13
-        test -f lib/macos_arm64/python/include/python3.13/Python.h
-        test -f lib/macos_arm64/python/lib/libpython3.13.a
-        echo "Python OK"
+          mkdir -p "$OPENEXR_ROOT/lib/cmake/OpenEXR"
 
-    - name: Inspect OpenEXR
-      run: |
-        echo "========================================"
-        echo "OPENEXR DIAGNOSTIC"
-        echo "========================================"
+          cat > "$OPENEXR_ROOT/lib/cmake/OpenEXR/OpenEXRConfig.cmake" <<'EOF'
+          set(OpenEXR_FOUND TRUE)
 
-        echo ""
-        echo "=== OpenEXR root ==="
-        ls -la lib/ios_arm64/openexr
+          set(OpenEXR_INCLUDE_DIRS
+            "${CMAKE_CURRENT_LIST_DIR}/../../../include"
+          )
 
-        echo ""
-        echo "=== OpenEXR include ==="
-        find lib/ios_arm64/openexr/include -maxdepth 3 -type f | sort | head -100
+          set(OpenEXR_LIBRARIES
+            "${CMAKE_CURRENT_LIST_DIR}/../../../lib/libOpenEXR.dylib"
+            "${CMAKE_CURRENT_LIST_DIR}/../../../lib/libOpenEXRCore.dylib"
+            "${CMAKE_CURRENT_LIST_DIR}/../../../lib/libOpenEXRUtil.dylib"
+            "${CMAKE_CURRENT_LIST_DIR}/../../../lib/libIex.dylib"
+            "${CMAKE_CURRENT_LIST_DIR}/../../../lib/libIlmThread.dylib"
+          )
 
-        echo ""
-        echo "=== OpenEXR libraries ==="
-        find lib/ios_arm64/openexr/lib -type f -print | sort
+          if(NOT TARGET OpenEXR::OpenEXR)
+            add_library(OpenEXR::OpenEXR UNKNOWN IMPORTED)
+            set_target_properties(OpenEXR::OpenEXR PROPERTIES
+              IMPORTED_LOCATION "${CMAKE_CURRENT_LIST_DIR}/../../../lib/libOpenEXR.dylib"
+              INTERFACE_INCLUDE_DIRECTORIES "${CMAKE_CURRENT_LIST_DIR}/../../../include"
+            )
+          endif()
+          EOF
 
-        echo ""
-        echo "=== OpenEXR CMake/package files ==="
-        find lib/ios_arm64/openexr \
-          \( -name "*.cmake" -o -name "*.cps" -o -name "*Config*" -o -name "*config*" \) \
-          -print | sort
+          cat > "$OPENEXR_ROOT/lib/cmake/OpenEXR/OpenEXRConfigVersion.cmake" <<'EOF'
+          set(PACKAGE_VERSION "3.2.4")
+          set(PACKAGE_VERSION_COMPATIBLE TRUE)
+          set(PACKAGE_VERSION_EXACT TRUE)
+          EOF
 
-    - name: Configure iOS build
-      run: |
-        set -e
+          echo "=== Created OpenEXR package ==="
+          cat "$OPENEXR_ROOT/lib/cmake/OpenEXR/OpenEXRConfig.cmake"
 
-        PYTHON_ROOT="$PWD/lib/macos_arm64/python"
+      - name: Configure iOS Build
+        run: |
+          PYTHON_ROOT="$PWD/lib/macos_arm64/python"
 
-        PYTHON_EXECUTABLE="$PYTHON_ROOT/bin/python3.13"
-        PYTHON_INCLUDE_DIR="$PYTHON_ROOT/include/python3.13"
-        PYTHON_LIBRARY="$PYTHON_ROOT/lib/libpython3.13.a"
-        PYTHON_INCLUDE_CONFIG_DIR="$PYTHON_ROOT/lib/python3.13/config-3.13-darwin"
+          PYTHON_EXECUTABLE="$PYTHON_ROOT/bin/python3.13"
+          PYTHON_INCLUDE_DIR="$PYTHON_ROOT/include/python3.13"
+          PYTHON_LIBRARY="$PYTHON_ROOT/lib/libpython3.13.a"
+          PYTHON_INCLUDE_CONFIG_DIR="$PYTHON_ROOT/lib/python3.13/config-3.13-darwin"
 
-        FREETYPE_ROOT="$PWD/lib/ios_arm64/freetype"
-        FREETYPE_INCLUDE_DIR="$FREETYPE_ROOT/include/freetype2"
-        FREETYPE_LIBRARY="$FREETYPE_ROOT/lib/libfreetype.a"
+          FREETYPE_ROOT="$PWD/lib/ios_arm64/freetype"
+          FREETYPE_INCLUDE_DIR="$FREETYPE_ROOT/include/freetype2"
+          FREETYPE_LIBRARY="$FREETYPE_ROOT/lib/libfreetype.a"
 
-        OPENEXR_ROOT="$PWD/lib/ios_arm64/openexr"
-        OPENEXR_INCLUDE_DIR="$OPENEXR_ROOT/include"
-        OPENEXR_LIBRARY="$OPENEXR_ROOT/lib/libOpenEXR.dylib"
-        OPENEXR_CORE_LIBRARY="$OPENEXR_ROOT/lib/libOpenEXRCore.dylib"
-        OPENEXR_UTIL_LIBRARY="$OPENEXR_ROOT/lib/libOpenEXRUtil.dylib"
-        OPENEXR_IEX_LIBRARY="$OPENEXR_ROOT/lib/libIex.dylib"
-        OPENEXR_ILMTHREAD_LIBRARY="$OPENEXR_ROOT/lib/libIlmThread.dylib"
+          OPENEXR_ROOT="$PWD/lib/ios_arm64/openexr"
+          OPENEXR_DIR="$OPENEXR_ROOT/lib/cmake/OpenEXR"
 
-        PNG_ROOT="$PWD/lib/ios_arm64/png"
-        PNG_INCLUDE_DIR="$PNG_ROOT/include"
-        PNG_LIBRARY="$PNG_ROOT/lib/libpng16.a"
+          PNG_ROOT="$PWD/lib/ios_arm64/png"
+          PNG_INCLUDE_DIR="$PNG_ROOT/include"
+          PNG_LIBRARY="$PNG_ROOT/lib/libpng16.a"
 
-        JPEG_ROOT="$PWD/lib/ios_arm64/jpeg"
-        JPEG_INCLUDE_DIR="$JPEG_ROOT/include"
-        JPEG_LIBRARY="$JPEG_ROOT/lib/libjpeg.a"
+          JPEG_ROOT="$PWD/lib/ios_arm64/jpeg"
+          JPEG_INCLUDE_DIR="$JPEG_ROOT/include"
+          JPEG_LIBRARY="$JPEG_ROOT/lib/libjpeg.a"
 
-        TIFF_ROOT="$PWD/lib/ios_arm64/tiff"
-        TIFF_INCLUDE_DIR="$TIFF_ROOT/include"
-        TIFF_LIBRARY="$TIFF_ROOT/lib/libtiff.a"
+          TIFF_ROOT="$PWD/lib/ios_arm64/tiff"
+          TIFF_INCLUDE_DIR="$TIFF_ROOT/include"
+          TIFF_LIBRARY="$TIFF_ROOT/lib/libtiff.a"
 
-        echo "========================================"
-        echo "CONFIGURING BLENDER FOR IOS"
-        echo "========================================"
+          echo "=== Python ==="
+          echo "$PYTHON_EXECUTABLE"
+          echo "$PYTHON_INCLUDE_DIR"
+          echo "$PYTHON_LIBRARY"
 
-        echo ""
-        echo "=== Python ==="
-        echo "$PYTHON_EXECUTABLE"
-        echo "$PYTHON_INCLUDE_DIR"
-        echo "$PYTHON_LIBRARY"
+          echo ""
+          echo "=== FreeType ==="
+          echo "$FREETYPE_INCLUDE_DIR"
+          echo "$FREETYPE_LIBRARY"
 
-        echo ""
-        echo "=== OpenEXR ==="
-        echo "$OPENEXR_ROOT"
-        echo "$OPENEXR_INCLUDE_DIR"
-        echo "$OPENEXR_LIBRARY"
+          echo ""
+          echo "=== OpenEXR ==="
+          echo "$OPENEXR_DIR"
 
-        echo ""
-        echo "=== PNG ==="
-        echo "$PNG_INCLUDE_DIR"
-        echo "$PNG_LIBRARY"
+          echo ""
+          echo "=== PNG ==="
+          echo "$PNG_INCLUDE_DIR"
+          echo "$PNG_LIBRARY"
 
-        echo ""
-        echo "=== JPEG ==="
-        echo "$JPEG_INCLUDE_DIR"
-        echo "$JPEG_LIBRARY"
+          echo ""
+          echo "=== JPEG ==="
+          echo "$JPEG_INCLUDE_DIR"
+          echo "$JPEG_LIBRARY"
 
-        echo ""
-        echo "=== TIFF ==="
-        echo "$TIFF_INCLUDE_DIR"
-        echo "$TIFF_LIBRARY"
-      
-        test -f "$PYTHON_EXECUTABLE"
-        test -f "$PYTHON_INCLUDE_DIR/Python.h"
-        test -f "$PYTHON_LIBRARY"
+          echo ""
+          echo "=== TIFF ==="
+          echo "$TIFF_INCLUDE_DIR"
+          echo "$TIFF_LIBRARY"
 
-        test -f "$FREETYPE_INCLUDE_DIR/ft2build.h"
-        test -f "$FREETYPE_LIBRARY"
+          test -f "$PYTHON_EXECUTABLE"
+          test -f "$PYTHON_INCLUDE_DIR/Python.h"
+          test -f "$PYTHON_LIBRARY"
 
-        test -f "$OPENEXR_INCLUDE_DIR/OpenEXR/ImfHeader.h"
-        test -f "$OPENEXR_LIBRARY"
-        test -f "$OPENEXR_CORE_LIBRARY"
+          test -f "$FREETYPE_INCLUDE_DIR/ft2build.h"
+          test -f "$FREETYPE_LIBRARY"
 
-        test -f "$PNG_INCLUDE_DIR/png.h"
-        test -f "$PNG_LIBRARY"
+          test -f "$OPENEXR_ROOT/include/OpenEXR/ImfRgba.h"
+          test -f "$OPENEXR_ROOT/lib/libOpenEXR.dylib"
 
-        test -f "$JPEG_INCLUDE_DIR/jpeglib.h"
-        test -f "$JPEG_LIBRARY"
+          test -f "$PNG_INCLUDE_DIR/png.h"
+          test -f "$PNG_LIBRARY"
 
-        test -f "$TIFF_LIBRARY"
-  
-        "$PYTHON_EXECUTABLE" --version
+          test -f "$JPEG_INCLUDE_DIR/jpeglib.h"
+          test -f "$JPEG_LIBRARY"
 
-        rm -rf build_ios
+          test -f "$TIFF_INCLUDE_DIR/tiff.h"
+          test -f "$TIFF_LIBRARY"
 
-        cmake -S . -B build_ios \
-          -G Xcode \
-          -DCMAKE_SYSTEM_NAME=iOS \
-          -DCMAKE_OSX_SYSROOT=iphoneos \
-          -DCMAKE_OSX_ARCHITECTURES=arm64 \
-          -DCMAKE_BUILD_TYPE=Release \
-          -DCMAKE_PREFIX_PATH="$OPENEXR_ROOT;$PNG_ROOT;$JPEG_ROOT;$TIFF_ROOT;$FREETYPE_ROOT" \
-          -DOpenEXR_ROOT="$OPENEXR_ROOT" \
-          -DOpenEXR_DIR="$OPENEXR_ROOT" \
-          -DOPENEXR_ROOT="$OPENEXR_ROOT" \
-          -DOPENEXR_INCLUDE_DIR="$OPENEXR_INCLUDE_DIR" \
-          -DOPENEXR_INCLUDE_DIRS="$OPENEXR_INCLUDE_DIR" \
-          -DOPENEXR_LIBRARY="$OPENEXR_LIBRARY" \
-          -DOPENEXR_LIBRARIES="$OPENEXR_LIBRARY;$OPENEXR_CORE_LIBRARY;$OPENEXR_UTIL_LIBRARY;$OPENEXR_IEX_LIBRARY;$OPENEXR_ILMTHREAD_LIBRARY" \
-          -DPYTHON_VERSION=3.13 \
-          -DPYTHON_EXECUTABLE="$PYTHON_EXECUTABLE" \
-          -DPYTHON_INCLUDE_DIR="$PYTHON_INCLUDE_DIR" \
-          -DPYTHON_LIBRARY="$PYTHON_LIBRARY" \
-          -DPYTHON_INCLUDE_CONFIG_DIR="$PYTHON_INCLUDE_CONFIG_DIR" \
-          -DFREETYPE_INCLUDE_DIRS="$FREETYPE_INCLUDE_DIR" \
-          -DFREETYPE_LIBRARY="$FREETYPE_LIBRARY" \
-          -DPNG_PNG_INCLUDE_DIR="$PNG_INCLUDE_DIR" \
-          -DPNG_LIBRARY="$PNG_LIBRARY" \
-          -DJPEG_INCLUDE_DIR="$JPEG_INCLUDE_DIR" \
-          -DJPEG_LIBRARY="$JPEG_LIBRARY" \
-          -DTIFF_INCLUDE_DIR="$TIFF_INCLUDE_DIR" \
-          -DTIFF_LIBRARY="$TIFF_LIBRARY"
+          "$PYTHON_EXECUTABLE" --version
 
-    - name: Build Blender
-      run: |
-        set -e
+          rm -rf build_ios
 
-        cmake --build build_ios \
-          --config Release \
-          --parallel "$(sysctl -n hw.ncpu)"
+          cmake -S . -B build_ios \
+            -G Xcode \
+            -DCMAKE_SYSTEM_NAME=iOS \
+            -DCMAKE_OSX_SYSROOT=iphoneos \
+            -DCMAKE_OSX_ARCHITECTURES=arm64 \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_PREFIX_PATH="$OPENEXR_ROOT;$PNG_ROOT;$JPEG_ROOT;$TIFF_ROOT" \
+            -DOpenEXR_DIR="$OPENEXR_DIR" \
+            -DOPENEXR_ROOT_DIR="$OPENEXR_ROOT" \
+            -DOPENEXR_INCLUDE_DIR="$OPENEXR_ROOT/include" \
+            -DOPENEXR_LIBRARY="$OPENEXR_ROOT/lib/libOpenEXR.dylib" \
+            -DPYTHON_VERSION=3.13 \
+            -DPYTHON_EXECUTABLE="$PYTHON_EXECUTABLE" \
+            -DPYTHON_INCLUDE_DIR="$PYTHON_INCLUDE_DIR" \
+            -DPYTHON_LIBRARY="$PYTHON_LIBRARY" \
+            -DPYTHON_INCLUDE_CONFIG_DIR="$PYTHON_INCLUDE_CONFIG_DIR" \
+            -DFREETYPE_INCLUDE_DIRS="$FREETYPE_INCLUDE_DIR" \
+            -DFREETYPE_LIBRARY="$FREETYPE_LIBRARY" \
+            -DPNG_INCLUDE_DIR="$PNG_INCLUDE_DIR" \
+            -DPNG_LIBRARY="$PNG_LIBRARY" \
+            -DJPEG_INCLUDE_DIR="$JPEG_INCLUDE_DIR" \
+            -DJPEG_LIBRARY="$JPEG_LIBRARY" \
+            -DTIFF_INCLUDE_DIR="$TIFF_INCLUDE_DIR" \
+            -DTIFF_LIBRARY="$TIFF_LIBRARY"
 
-    - name: Find Blender.app
-      run: |
-        echo "Searching for Blender.app..."
+      - name: Build Blender
+        run: |
+          cmake --build build_ios \
+            --config Release \
+            --parallel $(sysctl -n hw.ncpu)
 
-        find build_ios -type d -name "Blender.app" -print
+      - name: Find Blender App
+        run: |
+          echo "Searching for Blender.app..."
+          find build_ios -type d -name "Blender.app" -print
 
-    - name: Package unsigned IPA
-      run: |
-        set -e
+      - name: Package Unsigned IPA
+        run: |
+          APP="$(find build_ios -type d -name "Blender.app" -print -quit)"
 
-        APP="$(find build_ios -type d -name "Blender.app" -print -quit)"
+          if [ -z "$APP" ]; then
+            echo "ERROR: Blender.app was not produced."
+            exit 1
+          fi
 
-        if [ -z "$APP" ]; then
-          echo "ERROR: Blender.app was not produced."
-          exit 1
-        fi
+          rm -rf Payload
+          mkdir -p Payload
 
-        rm -rf Payload
-        mkdir -p Payload
+          cp -R "$APP" Payload/Blender.app
 
-        cp -R "$APP" Payload/Blender.app
+          /usr/bin/ditto \
+            -c -k \
+            --sequesterRsrc \
+            --keepParent \
+            Payload \
+            Blender-iPad-unsigned.ipa
 
-        /usr/bin/ditto \
-          -c -k \
-          --sequesterRsrc \
-          --keepParent \
-          Payload \
-          Blender-iPad-unsigned.ipa
-
-    - name: Upload IPA
-      uses: actions/upload-artifact@v4
-      with:
-        name: Blender-iPad-unsigned
-        path: Blender-iPad-unsigned.ipa
+      - name: Upload IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: Blender-iPad-unsigned
+          path: Blender-iPad-unsigned.ipa
