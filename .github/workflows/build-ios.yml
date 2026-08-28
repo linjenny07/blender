@@ -284,6 +284,10 @@ jobs:
           FREETYPE_INCLUDE_DIR="$FREETYPE_ROOT/include/freetype2"
           FREETYPE_LIBRARY="$FREETYPE_ROOT/lib/libfreetype.a"
 
+          PNG_ROOT="$PWD/lib/ios_arm64/png"
+          PNG_INCLUDE_DIR="$PNG_ROOT/include"
+          PNG_LIBRARY="$PNG_ROOT/lib/libpng.a"
+
           OPENEXR_ROOT="$PWD/lib/ios_arm64/openexr"
           OPENEXR_DIR="$OPENEXR_ROOT/lib/cmake/OpenEXR"
 
@@ -297,6 +301,9 @@ jobs:
           echo "=== FreeType configuration ==="
           echo "Include:    $FREETYPE_INCLUDE_DIR"
           echo "Library:    $FREETYPE_LIBRARY"
+
+          -DFREETYPE_INCLUDE_DIRS="$FREETYPE_INCLUDE_DIR" \
+          -DFREETYPE_LIBRARY="$FREETYPE_LIBRARY" \
 
           echo ""
           echo "=== OpenEXR configuration ==="
@@ -332,6 +339,8 @@ jobs:
             -DPYTHON_INCLUDE_CONFIG_DIR="$PYTHON_INCLUDE_CONFIG_DIR" \
             -DFREETYPE_INCLUDE_DIRS="$FREETYPE_INCLUDE_DIR" \
             -DFREETYPE_LIBRARY="$FREETYPE_LIBRARY"
+            -DPNG_PNG_INCLUDE_DIR="$PNG_INCLUDE_DIR" \
+            -DPNG_LIBRARY="$PNG_LIBRARY"
 
       - name: Verify CMake configuration
         run: |
