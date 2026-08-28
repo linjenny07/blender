@@ -9,26 +9,20 @@ jobs:
     runs-on: macos-26
 
     steps:
-      - name: Checkout iOS branch
-        uses: actions/checkout@v4
-        with:
-          repository: linjenny07/blender
-          ref: ios
-          submodules: recursive
-          lfs: false
-
-      - name: Check Blender LFS files
-        run: |
-          echo "=== Git LFS status ==="
-          git lfs status
-
-          echo ""
-          echo "=== LFS files referenced by checkout ==="
-          git lfs ls-files | head -100
-
-          echo ""
-          echo "=== Startup blend ==="
-          find . -name "startup.blend" -o -name "*.blend" | head -30
+      - name: Checkout iOS branch 
+        uses: actions/checkout@v4 
+        env: 
+          GIT_LFS_SKIP_SMUDGE: "1" 
+        with: 
+          repository: linjenny07/blender 
+          ref: ios 
+          submodules: recursive 
+          lfs: false 
+        
+      - name: Fetch Blender LFS data 
+        run: | 
+          git lfs install --local 
+          ./build_files/utils/make_update.py --no-libraries
           
       - name: Fetch iOS libraries
         run: |
