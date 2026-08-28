@@ -109,6 +109,36 @@ jobs:
           echo "=== macOS library directory ==="
           ls -la lib/macos_arm64 | head -100
 
+      - name: Inspect OpenEXR
+        run: |
+          echo "================================"
+          echo " SEARCHING FOR OPENEXR"
+          echo "================================"
+
+          echo "--- iOS OpenEXR ---"
+          find "$PWD/lib/ios_arm64" -iname "openexr" -print
+
+          echo "--- OpenEXR config files ---"
+          find "$PWD/lib/ios_arm64"
+          ( -name "OpenEXRConfig.cmake"
+          -o -name "openexr-config.cmake"
+          -o -name "OpenEXRConfigVersion.cmake" )
+          -print
+
+          echo "--- OpenEXR headers ---"
+          find "$PWD/lib/ios_arm64"
+          ( -name "Imf*.h" -o -name "OpenEXR*.h" )
+          -print | head -50
+
+          echo "--- OpenEXR libraries ---"
+          find "$PWD/lib/ios_arm64"
+          ( -name "libOpenEXR*.a" -o -name "libOpenEXR*.dylib" )
+          -print
+
+          echo "================================"
+          echo " END OPENEXR SEARCH"
+          echo "================================"
+
       - name: Configure iOS build
         run: |
           PYTHON_ROOT="$PWD/lib/macos_arm64/python"
