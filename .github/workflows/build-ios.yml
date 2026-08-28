@@ -46,7 +46,10 @@ jobs:
 
       - name: Show Apple Toolchain
         run: |
-          echo "=== Xcode ==="
+          echo "========================================"
+          echo "APPLE TOOLCHAIN"
+          echo "========================================"
+
           xcodebuild -version
 
           echo ""
@@ -60,6 +63,38 @@ jobs:
           echo ""
           echo "=== Ninja ==="
           ninja --version
+
+      - name: Inspect OpenEXR
+        run: |
+          echo "========================================"
+          echo "OPENEXR DIAGNOSTIC"
+          echo "========================================"
+
+          OPENEXR_ROOT="$PWD/lib/ios_arm64/openexr"
+
+          echo ""
+          echo "=== OpenEXR root ==="
+          ls -la "$OPENEXR_ROOT"
+
+          echo ""
+          echo "=== OpenEXR directories ==="
+          find "$OPENEXR_ROOT" -type d -maxdepth 6 -print | sort
+
+          echo ""
+          echo "=== OpenEXR libraries ==="
+          find "$OPENEXR_ROOT" -type f \
+            \( -name "*.a" -o -name "*.dylib" -o -name "*.tbd" \) \
+            -print | sort
+
+          echo ""
+          echo "=== OpenEXR CMake/package files ==="
+          find "$OPENEXR_ROOT" -type f \
+            \( -name "*.cmake" -o -name "*.cps" \) \
+            -print | sort
+
+          echo ""
+          echo "=== OpenEXR headers ==="
+          find "$OPENEXR_ROOT/include" -type f | head -100
 
       - name: Verify Dependencies
         run: |
@@ -78,7 +113,7 @@ jobs:
           FREETYPE_LIBRARY="$FREETYPE_ROOT/lib/libfreetype.a"
 
           OPENEXR_ROOT="$PWD/lib/ios_arm64/openexr"
-          OPENEXR_DIR="$OPENEXR_ROOT/lib/cmake/OpenEXR"
+          OPENEXR_INCLUDE_DIR="$OPENEXR_ROOT/include"
 
           PNG_ROOT="$PWD/lib/ios_arm64/png"
           PNG_INCLUDE_DIR="$PNG_ROOT/include"
@@ -93,89 +128,44 @@ jobs:
           TIFF_LIBRARY="$TIFF_ROOT/lib/libtiff.a"
 
           echo ""
-          echo "=== Checking Python executable ==="
-          if [ -f "$PYTHON_EXECUTABLE" ]; then
-            echo "OK: $PYTHON_EXECUTABLE"
-          else
-            echo "ERROR: Python executable missing"
-            exit 1
-          fi
+          echo "=== Python ==="
+          test -f "$PYTHON_EXECUTABLE" || { echo "ERROR: Python executable missing"; exit 1; }
+          test -f "$PYTHON_INCLUDE_DIR/Python.h" || { echo "ERROR: Python.h missing"; exit 1; }
+          test -f "$PYTHON_LIBRARY" || { echo "ERROR: Python library missing"; exit 1; }
+          echo "Python OK"
 
           echo ""
-          echo "=== Checking Python headers ==="
-          if [ -f "$PYTHON_INCLUDE_DIR/Python.h" ]; then
-            echo "OK: $PYTHON_INCLUDE_DIR/Python.h"
-          else
-            echo "ERROR: Python.h missing"
-            exit 1
-          fi
+          echo "=== FreeType ==="
+          test -f "$FREETYPE_INCLUDE_DIR/ft2build.h" || { echo "ERROR: FreeType headers missing"; exit 1; }
+          test -f "$FREETYPE_LIBRARY" || { echo "ERROR: FreeType library missing"; exit 1; }
+          echo "FreeType OK"
 
           echo ""
-          echo "=== Checking Python library ==="
-          if [ -f "$PYTHON_LIBRARY" ]; then
-            echo "OK: $PYTHON_LIBRARY"
-          else
-            echo "ERROR: libpython3.13.a missing"
-            exit 1
-          fi
+          echo "=== OpenEXR ==="
+          test -d "$OPENEXR_INCLUDE_DIR/OpenEXR" || { echo "ERROR: OpenEXR headers missing"; exit 1; }
+          echo "OpenEXR headers OK"
 
           echo ""
-          echo "=== Checking FreeType ==="
-          if [ -f "$FREETYPE_INCLUDE_DIR/ft2build.h" ]; then
-            echo "OK: FreeType headers"
-          else
-            echo "ERROR: FreeType headers missing"
-            exit 1
-          fi
-
-          if [ -f "$FREETYPE_LIBRARY" ]; then
-            echo "OK: FreeType library"
-          else
-            echo "ERROR: FreeType library missing"
-            exit 1
-          fi
+          echo "=== PNG ==="
+          test -f "$PNG_INCLUDE_DIR/png.h" || { echo "ERROR: PNG headers missing"; exit 1; }
+          test -f "$PNG_LIBRARY" || { echo "ERROR: PNG library missing"; exit 1; }
+          echo "PNG OK"
 
           echo ""
-          echo "=== Checking OpenEXR ==="
-          if [ -d "$OPENEXR_DIR" ]; then
-            echo "OK: OpenEXR CMake directory exists"
-            ls -la "$OPENEXR_DIR"
-          else
-            echo "ERROR: OpenEXR CMake directory missing"
-            find "$OPENEXR_ROOT" -maxdepth 8 -type f -print
-            exit 1
-          fi
+          echo "=== JPEG ==="
+          test -f "$JPEG_INCLUDE_DIR/jpeglib.h" || { echo "ERROR: JPEG headers missing"; exit 1; }
+          test -f "$JPEG_LIBRARY" || { echo "ERROR: JPEG library missing"; exit 1; }
+          echo "JPEG OK"
 
           echo ""
-          echo "=== Checking PNG ==="
-          if [ -f "$PNG_LIBRARY" ]; then
-            echo "OK: $PNG_LIBRARY"
-          else
-            echo "ERROR: PNG library missing"
-            exit 1
-          fi
-
-          echo ""
-          echo "=== Checking JPEG ==="
-          if [ -f "$JPEG_LIBRARY" ]; then
-            echo "OK: $JPEG_LIBRARY"
-          else
-            echo "ERROR: JPEG library missing"
-            exit 1
-          fi
-
-          echo ""
-          echo "=== Checking TIFF ==="
-          if [ -f "$TIFF_LIBRARY" ]; then
-            echo "OK: $TIFF_LIBRARY"
-          else
-            echo "ERROR: TIFF library missing"
-            exit 1
-          fi
+          echo "=== TIFF ==="
+          test -f "$TIFF_INCLUDE_DIR/tiff.h" || { echo "ERROR: TIFF headers missing"; exit 1; }
+          test -f "$TIFF_LIBRARY" || { echo "ERROR: TIFF library missing"; exit 1; }
+          echo "TIFF OK"
 
           echo ""
           echo "========================================"
-          echo "ALL REQUIRED CHECKS PASSED"
+          echo "DEPENDENCY CHECKS PASSED"
           echo "========================================"
 
       - name: Configure iOS Build
@@ -194,7 +184,7 @@ jobs:
           FREETYPE_LIBRARY="$FREETYPE_ROOT/lib/libfreetype.a"
 
           OPENEXR_ROOT="$PWD/lib/ios_arm64/openexr"
-          OPENEXR_DIR="$OPENEXR_ROOT/lib/cmake/OpenEXR"
+          OPENEXR_INCLUDE_DIR="$OPENEXR_ROOT/include"
 
           PNG_ROOT="$PWD/lib/ios_arm64/png"
           PNG_INCLUDE_DIR="$PNG_ROOT/include"
@@ -220,8 +210,7 @@ jobs:
             -DCMAKE_OSX_SYSROOT=iphoneos \
             -DCMAKE_OSX_ARCHITECTURES=arm64 \
             -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_PREFIX_PATH="$PWD/lib/ios_arm64;$OPENEXR_ROOT" \
-            -DOpenEXR_DIR="$OPENEXR_DIR" \
+            -DCMAKE_PREFIX_PATH="$PWD/lib/ios_arm64" \
             -DPYTHON_VERSION=3.13 \
             -DPYTHON_EXECUTABLE="$PYTHON_EXECUTABLE" \
             -DPYTHON_INCLUDE_DIR="$PYTHON_INCLUDE_DIR" \
