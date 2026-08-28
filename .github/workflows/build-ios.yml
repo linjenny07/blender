@@ -120,6 +120,11 @@ jobs:
           echo "=== OpenEXR files ==="
           find lib/ios_arm64/openexr -maxdepth 4 -type f -print | head -100
 
+      - name: Locate OpenEXR libraries
+        run: |
+          echo "=== OpenEXR files ==="
+          find lib/ios_arm64/openexr -type f -print
+
       - name: Configure iOS build
         run: |
           PYTHON_ROOT="$PWD/lib/macos_arm64/python"
