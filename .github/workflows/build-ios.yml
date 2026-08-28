@@ -15,8 +15,21 @@ jobs:
           repository: linjenny07/blender
           ref: ios
           submodules: recursive
-          lfs: true
+          lfs: false
 
+      - name: Check Blender LFS files
+        run: |
+          echo "=== Git LFS status ==="
+          git lfs status
+
+          echo ""
+          echo "=== LFS files referenced by checkout ==="
+          git lfs ls-files | head -100
+
+          echo ""
+          echo "=== Startup blend ==="
+          find . -name "startup.blend" -o -name "*.blend" | head -30
+          
       - name: Fetch iOS libraries
         run: |
           rm -rf lib/ios_arm64
