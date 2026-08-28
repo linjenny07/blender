@@ -118,38 +118,29 @@ jobs:
           PYTHON_LIBRARY="$PYTHON_ROOT/lib/libpython3.13.a"
           PYTHON_INCLUDE_CONFIG_DIR="$PYTHON_ROOT/lib/python3.13/config-3.13-darwin"
 
+          FREETYPE_ROOT="$PWD/lib/ios_arm64/freetype"
+          FREETYPE_INCLUDE_DIR="$FREETYPE_ROOT/include/freetype2"
+          FREETYPE_LIBRARY="$FREETYPE_ROOT/lib/libfreetype.a"
+
           echo "=== Python configuration ==="
           echo "Executable: $PYTHON_EXECUTABLE"
           echo "Include:    $PYTHON_INCLUDE_DIR"
           echo "Library:    $PYTHON_LIBRARY"
           echo "Config:     $PYTHON_INCLUDE_CONFIG_DIR"
 
+          echo "=== FreeType configuration ==="
+          echo "Include:    $FREETYPE_INCLUDE_DIR"
+          echo "Library:    $FREETYPE_LIBRARY"
+
           test -f "$PYTHON_EXECUTABLE"
           test -f "$PYTHON_INCLUDE_DIR/Python.h"
           test -f "$PYTHON_LIBRARY"
           test -d "$PYTHON_INCLUDE_CONFIG_DIR"
 
+          test -f "$FREETYPE_INCLUDE_DIR/ft2build.h"
+          test -f "$FREETYPE_LIBRARY"
+
           "$PYTHON_EXECUTABLE" --version
-
-          echo ""
-          echo "================================"
-          echo " SEARCHING FOR FREETYPE"
-          echo "================================"
-
-          echo "--- iOS libraries ---"
-          find "$PWD/lib/ios_arm64" \
-            \( -iname "*freetype*" -o -name "ft2build.h" -o -name "freetype.h" \) \
-            -print
-
-          echo "--- ALL Blender libraries ---"
-          find "$PWD/lib" \
-            \( -iname "*freetype*" -o -name "ft2build.h" -o -name "freetype.h" \) \
-            -print
-
-          echo ""
-          echo "================================"
-          echo " END FREETYPE SEARCH"
-          echo "================================"
 
           rm -rf build_ios
 
@@ -163,7 +154,9 @@ jobs:
             -DPYTHON_EXECUTABLE="$PYTHON_EXECUTABLE" \
             -DPYTHON_INCLUDE_DIR="$PYTHON_INCLUDE_DIR" \
             -DPYTHON_LIBRARY="$PYTHON_LIBRARY" \
-            -DPYTHON_INCLUDE_CONFIG_DIR="$PYTHON_INCLUDE_CONFIG_DIR"
+            -DPYTHON_INCLUDE_CONFIG_DIR="$PYTHON_INCLUDE_CONFIG_DIR" \
+            -DFREETYPE_INCLUDE_DIRS="$FREETYPE_INCLUDE_DIR" \
+            -DFREETYPE_LIBRARY="$FREETYPE_LIBRARY"
 
       - name: Build Blender
         run: |
