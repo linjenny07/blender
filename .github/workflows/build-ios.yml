@@ -131,6 +131,8 @@ jobs:
 
           "$PYTHON_EXECUTABLE" --version
 
+          rm -rf build_ios
+          
           echo "=== Searching for FreeType ==="
           find "$PWD/lib/ios_arm64" \
             \( -iname "*freetype*" -o -name "ft2build.h" -o -name "freetype.h" \) \
@@ -140,8 +142,6 @@ jobs:
           find "$PWD/lib" \
             \( -iname "*freetype*" -o -name "ft2build.h" -o -name "freetype.h" \) \
             -print
-            
-          rm -rf build_ios
 
           cmake -S . -B build_ios \
             -G Xcode \
