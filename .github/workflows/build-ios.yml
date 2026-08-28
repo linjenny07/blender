@@ -192,6 +192,22 @@ jobs:
             -DFREETYPE_INCLUDE_DIRS="$FREETYPE_INCLUDE_DIR" \
             -DFREETYPE_LIBRARY="$FREETYPE_LIBRARY"
 
+      - name: Debug OpenEXR
+        run: |
+          echo "=== OpenEXR files ==="
+          find "$PWD/lib/ios_arm64/openexr" -maxdepth 3 -type f | sort
+
+          echo "=== OpenEXR libraries ==="
+          find "$PWD/lib/ios_arm64/openexr/lib" -type f -print
+
+          echo "=== OpenEXR CMake/package files ==="
+          find "$PWD/lib/ios_arm64/openexr" \
+          \( -name "*.cmake" -o -name "*.cps" -o -name "*Config*" -o -name "*config*" \) \
+          -print
+
+          echo "=== Blender OpenEXR CMake section ==="
+          sed -n '320,355p' build_files/cmake/platform/platform_apple.cmake
+
       - name: Build Blender
         run: |
           rm -rf build_ios
