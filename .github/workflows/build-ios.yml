@@ -9,21 +9,21 @@ jobs:
     runs-on: macos-26
 
     steps:
-      - name: Checkout iOS branch 
-        uses: actions/checkout@v4 
-        env: 
-          GIT_LFS_SKIP_SMUDGE: "1" 
-        with: 
-          repository: linjenny07/blender 
-          ref: ios 
-          submodules: recursive 
-          lfs: false 
-        
-      - name: Fetch Blender LFS data 
-        run: | 
-          git lfs install --local 
+      - name: Checkout iOS branch
+        uses: actions/checkout@v4
+        env:
+          GIT_LFS_SKIP_SMUDGE: "1"
+        with:
+          repository: linjenny07/blender
+          ref: ios
+          submodules: recursive
+          lfs: false
+
+      - name: Fetch Blender LFS data
+        run: |
+          git lfs install --local
           ./build_files/utils/make_update.py --no-libraries
-          
+
       - name: Fetch iOS libraries
         run: |
           rm -rf lib/ios_arm64
@@ -114,34 +114,120 @@ jobs:
           echo "=== OpenEXR directory ==="
           ls -la lib/ios_arm64/openexr
 
+          echo ""
           echo "=== OpenEXR include ==="
           ls -la lib/ios_arm64/openexr/include/OpenEXR | head -30
 
-          echo "=== OpenEXR files ==="
-          find lib/ios_arm64/openexr -maxdepth 4 -type f -print | head -100
-
-      - name: Locate OpenEXR libraries
-        run: |
-          echo "=== OpenEXR files ==="
-          find lib/ios_arm64/openexr -type f -print
-
-      - name: Locate IpenEXR CMake configuration
-        run: |
-          echo "=== OpenEXR directory ==="
-          find "$PWD/lib/ios_arm64/openexr" -maxdepth 6 -type f -print
-
-          echo "=== OpenEXR CMake files ==="
-          find "$PWD/lib/ios_arm64/openexr" -type f
-          ( -name "OpenEXRConfig.cmake"
-          -o -name "openexr-config.cmake"
-          -o -name "OpenEXRConfigVersion.cmake"
-          -o -name "*.cmake" )
-          -print
-
+          echo ""
           echo "=== OpenEXR libraries ==="
-          find "$PWD/lib/ios_arm64/openexr" -type f
-          ( -name ".a" -o -name ".dylib" )
-          -print
+          find lib/ios_arm64/openexr/lib \
+            -type f \
+            -print \
+            || true
+
+          echo ""
+          echo "=== OpenEXR CMake/package files ==="
+          find lib/ios_arm64/openexr \
+            -type f \
+            \( \
+              -name "*.cmake" \
+              -o -name "*.cps" \
+              -o -name "*Config*" \
+              -o -name "*config*" \
+            \) \
+            -print \
+            || true
+
+      - name: Create OpenEXR CMake package
+        run: |
+          OPENEXR_ROOT="$PWD/lib/ios_arm64/openexr"
+          OPENEXR_CMAKE_DIR="$OPENEXR_ROOT/lib/cmake/OpenEXR"
+
+          echo "Creating OpenEXR CMake package:"
+          echo "$OPENEXR_CMAKE_DIR"
+
+          mkdir -p "$OPENEXR_CMAKE_DIR"
+
+          cat > "$OPENEXR_CMAKE_DIR/OpenEXRConfig.cmake" <<EOF
+          set(OpenEXR_FOUND TRUE)
+
+          set(OpenEXR_INCLUDE_DIRS
+              "${OPENEXR_ROOT}/include"
+              "${OPENEXR_ROOT}/include/OpenEXR"
+          )
+
+          set(OpenEXR_LIBRARIES
+              "${OPENEXR_ROOT}/lib/libOpenEXR.dylib"
+              "${OPENEXR_ROOT}/lib/libOpenEXRCore.dylib"
+              "${OPENEXR_ROOT}/lib/libOpenEXRUtil.dylib"
+              "${OPENEXR_ROOT}/lib/libIex.dylib"
+              "${OPENEXR_ROOT}/lib/libIlmThread.dylib"
+          )
+
+          if(NOT TARGET OpenEXR::OpenEXR)
+            add_library(OpenEXR::OpenEXR UNKNOWN IMPORTED)
+            set_target_properties(OpenEXR::OpenEXR PROPERTIES
+              IMPORTED_LOCATION
+                "${OPENEXR_ROOT}/lib/libOpenEXR.dylib"
+              INTERFACE_INCLUDE_DIRECTORIES
+                "${OPENEXR_ROOT}/include"
+            )
+          endif()
+
+          if(NOT TARGET OpenEXR::OpenEXRCore)
+            add_library(OpenEXR::OpenEXRCore UNKNOWN IMPORTED)
+            set_target_properties(OpenEXR::OpenEXRCore PROPERTIES
+              IMPORTED_LOCATION
+                "${OPENEXR_ROOT}/lib/libOpenEXRCore.dylib"
+              INTERFACE_INCLUDE_DIRECTORIES
+                "${OPENEXR_ROOT}/include"
+            )
+          endif()
+
+          if(NOT TARGET OpenEXR::OpenEXRUtil)
+            add_library(OpenEXR::OpenEXRUtil UNKNOWN IMPORTED)
+            set_target_properties(OpenEXR::OpenEXRUtil PROPERTIES
+              IMPORTED_LOCATION
+                "${OPENEXR_ROOT}/lib/libOpenEXRUtil.dylib"
+              INTERFACE_INCLUDE_DIRECTORIES
+                "${OPENEXR_ROOT}/include"
+            )
+          endif()
+
+          if(NOT TARGET OpenEXR::Iex)
+            add_library(OpenEXR::Iex UNKNOWN IMPORTED)
+            set_target_properties(OpenEXR::Iex PROPERTIES
+              IMPORTED_LOCATION
+                "${OPENEXR_ROOT}/lib/libIex.dylib"
+              INTERFACE_INCLUDE_DIRECTORIES
+                "${OPENEXR_ROOT}/include"
+            )
+          endif()
+
+          if(NOT TARGET OpenEXR::IlmThread)
+            add_library(OpenEXR::IlmThread UNKNOWN IMPORTED)
+            set_target_properties(OpenEXR::IlmThread PROPERTIES
+              IMPORTED_LOCATION
+                "${OPENEXR_ROOT}/lib/libIlmThread.dylib"
+              INTERFACE_INCLUDE_DIRECTORIES
+                "${OPENEXR_ROOT}/include"
+            )
+          endif()
+          EOF
+
+          cat > "$OPENEXR_CMAKE_DIR/OpenEXRConfigVersion.cmake" <<EOF
+          set(PACKAGE_VERSION "3.3.0")
+          set(PACKAGE_VERSION_COMPATIBLE TRUE)
+          set(PACKAGE_VERSION_EXACT TRUE)
+          EOF
+
+          echo ""
+          echo "=== Created OpenEXR CMake package ==="
+          find "$OPENEXR_CMAKE_DIR" -type f -maxdepth 1 -print
+
+          echo ""
+          echo "=== OpenEXRConfig.cmake ==="
+          cat "$OPENEXR_CMAKE_DIR/OpenEXRConfig.cmake"
 
       - name: Configure iOS build
         run: |
@@ -156,15 +242,24 @@ jobs:
           FREETYPE_INCLUDE_DIR="$FREETYPE_ROOT/include/freetype2"
           FREETYPE_LIBRARY="$FREETYPE_ROOT/lib/libfreetype.a"
 
+          OPENEXR_ROOT="$PWD/lib/ios_arm64/openexr"
+          OPENEXR_DIR="$OPENEXR_ROOT/lib/cmake/OpenEXR"
+
           echo "=== Python configuration ==="
           echo "Executable: $PYTHON_EXECUTABLE"
           echo "Include:    $PYTHON_INCLUDE_DIR"
           echo "Library:    $PYTHON_LIBRARY"
           echo "Config:     $PYTHON_INCLUDE_CONFIG_DIR"
 
+          echo ""
           echo "=== FreeType configuration ==="
           echo "Include:    $FREETYPE_INCLUDE_DIR"
           echo "Library:    $FREETYPE_LIBRARY"
+
+          echo ""
+          echo "=== OpenEXR configuration ==="
+          echo "Root:       $OPENEXR_ROOT"
+          echo "CMake dir:  $OPENEXR_DIR"
 
           test -f "$PYTHON_EXECUTABLE"
           test -f "$PYTHON_INCLUDE_DIR/Python.h"
@@ -173,6 +268,8 @@ jobs:
 
           test -f "$FREETYPE_INCLUDE_DIR/ft2build.h"
           test -f "$FREETYPE_LIBRARY"
+
+          test -f "$OPENEXR_DIR/OpenEXRConfig.cmake"
 
           "$PYTHON_EXECUTABLE" --version
 
@@ -184,6 +281,8 @@ jobs:
             -DCMAKE_OSX_SYSROOT=iphoneos \
             -DCMAKE_OSX_ARCHITECTURES=arm64 \
             -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_PREFIX_PATH="$OPENEXR_DIR" \
+            -DOpenEXR_DIR="$OPENEXR_DIR" \
             -DPYTHON_VERSION=3.13 \
             -DPYTHON_EXECUTABLE="$PYTHON_EXECUTABLE" \
             -DPYTHON_INCLUDE_DIR="$PYTHON_INCLUDE_DIR" \
@@ -192,25 +291,20 @@ jobs:
             -DFREETYPE_INCLUDE_DIRS="$FREETYPE_INCLUDE_DIR" \
             -DFREETYPE_LIBRARY="$FREETYPE_LIBRARY"
 
-      - name: Debug OpenEXR
+      - name: Verify CMake configuration
         run: |
-          echo "=== OpenEXR files ==="
-          find "$PWD/lib/ios_arm64/openexr" -maxdepth 3 -type f | sort
+          echo "=== OpenEXR CMake cache ==="
+          grep -i "OpenEXR" build_ios/CMakeCache.txt || true
 
-          echo "=== OpenEXR libraries ==="
-          find "$PWD/lib/ios_arm64/openexr/lib" -type f -print
-
-          echo "=== OpenEXR CMake/package files ==="
-          find "$PWD/lib/ios_arm64/openexr" \
-          \( -name "*.cmake" -o -name "*.cps" -o -name "*Config*" -o -name "*config*" \) \
-          -print
-
-          echo "=== Blender OpenEXR CMake section ==="
-          sed -n '320,355p' build_files/cmake/platform/platform_apple.cmake
+          echo ""
+          echo "=== OpenEXR package ==="
+          find lib/ios_arm64/openexr/lib/cmake \
+            -type f \
+            -print \
+            || true
 
       - name: Build Blender
         run: |
-          rm -rf build_ios
           cmake --build build_ios \
             --config Release \
             --parallel $(sysctl -n hw.ncpu)
@@ -218,7 +312,11 @@ jobs:
       - name: Find Blender.app
         run: |
           echo "Searching for Blender.app..."
-          find build_ios -type d -name "Blender.app" -print
+
+          find build_ios \
+            -type d \
+            -name "Blender.app" \
+            -print
 
       - name: Package unsigned IPA
         run: |
@@ -231,7 +329,13 @@ jobs:
 
           mkdir -p Payload
           cp -R "$APP" Payload/Blender.app
-          /usr/bin/ditto -c -k --sequesterRsrc --keepParent Payload Blender-iPad-unsigned.ipa
+
+          /usr/bin/ditto \
+            -c -k \
+            --sequesterRsrc \
+            --keepParent \
+            Payload \
+            Blender-iPad-unsigned.ipa
 
       - name: Upload IPA
         uses: actions/upload-artifact@v4
