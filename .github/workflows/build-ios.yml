@@ -131,6 +131,16 @@ jobs:
 
           "$PYTHON_EXECUTABLE" --version
 
+          echo "=== Searching for FreeType ==="
+          find "$PWD/lib/ios_arm64" \
+            \( -iname "*freetype*" -o -name "ft2build.h" -o -name "freetype.h" \) \
+            -print
+
+          echo "=== Searching all Blender libraries for FreeType ==="
+          find "$PWD/lib" \
+            \( -iname "*freetype*" -o -name "ft2build.h" -o -name "freetype.h" \) \
+            -print
+            
           rm -rf build_ios
 
           cmake -S . -B build_ios \
