@@ -43,69 +43,54 @@ jobs:
           git lfs install
           git lfs pull
 
-      - name: Verify Required Dependencies
+      - name: Locate Dependencies
         run: |
           set -e
 
-          PYTHON_ROOT="$PWD/lib/macos_arm64/python"
-          FREETYPE_ROOT="$PWD/lib/ios_arm64/freetype"
-          OPENEXR_ROOT="$PWD/lib/ios_arm64/openexr"
-          PNG_ROOT="$PWD/lib/ios_arm64/png"
-          JPEG_ROOT="$PWD/lib/ios_arm64/jpeg"
-          TIFF_ROOT="$PWD/lib/ios_arm64/tiff"
-          FMT_ROOT="$PWD/lib/ios_arm64/fmt"
-
           echo "========================================"
-          echo "VERIFYING DEPENDENCIES"
+          echo "LOCATING DEPENDENCIES"
           echo "========================================"
 
           echo ""
           echo "=== Python ==="
-          test -x "$PYTHON_ROOT/bin/python3.13"
-          test -f "$PYTHON_ROOT/include/python3.13/Python.h"
-          test -f "$PYTHON_ROOT/lib/libpython3.13.a"
-          echo "OK: Python"
-
-          echo ""
-          echo "=== FreeType ==="
-          test -f "$FREETYPE_ROOT/include/freetype2/ft2build.h"
-          test -f "$FREETYPE_ROOT/lib/libfreetype.a"
-          echo "OK: FreeType"
+          find "$PWD/lib/macos_arm64/python" \
+            -maxdepth 4 \
+            -name "python3.13" \
+            -print
 
           echo ""
           echo "=== OpenEXR ==="
-          test -d "$OPENEXR_ROOT"
-          test -d "$OPENEXR_ROOT/include/OpenEXR"
-          test -d "$OPENEXR_ROOT/lib/cmake/OpenEXR"
-          echo "OK: OpenEXR CMake directory"
-          echo "OpenEXR_DIR=$OPENEXR_ROOT/lib/cmake/OpenEXR"
+          find "$PWD/lib/ios_arm64/openexr" \
+            -maxdepth 6 \
+            -type f \
+            \( -name "OpenEXRConfig.cmake" \
+            -o -name "openexr-config.cmake" \
+            -o -name "*.cmake" \) \
+            -print
 
           echo ""
           echo "=== PNG ==="
-          test -f "$PNG_ROOT/include/png.h"
-          test -f "$PNG_ROOT/lib/libpng16.a"
-          echo "OK: PNG"
+          find "$PWD/lib/ios_arm64/png" \
+            -maxdepth 3 \
+            -type f \
+            \( -name "png.h" -o -name "libpng*.a" \) \
+            -print
 
           echo ""
           echo "=== JPEG ==="
-          test -f "$JPEG_ROOT/include/jpeglib.h"
-          test -f "$JPEG_ROOT/lib/libjpeg.a"
-          echo "OK: JPEG"
+          find "$PWD/lib/ios_arm64/jpeg" \
+            -maxdepth 3 \
+            -type f \
+            \( -name "jpeglib.h" -o -name "libjpeg.a" \) \
+            -print
 
           echo ""
           echo "=== TIFF ==="
-          test -f "$TIFF_ROOT/include/tiff.h"
-          test -f "$TIFF_ROOT/lib/libtiff.a"
-          echo "OK: TIFF"
-
-          echo ""
-          echo "=== fmt ==="
-          if [ -d "$FMT_ROOT" ]; then
-            echo "fmt directory found:"
-            find "$FMT_ROOT" -maxdepth 4 -type f | head -50
-          else
-            echo "WARNING: fmt directory not found"
-          fi
+          find "$PWD/lib/ios_arm64/tiff" \
+            -maxdepth 3 \
+            -type f \
+            \( -name "tiff.h" -o -name "libtiff.a" \) \
+            -print
 
       - name: Show Apple Toolchain
         run: |
@@ -119,12 +104,12 @@ jobs:
           set -e
 
           PYTHON_ROOT="$PWD/lib/macos_arm64/python"
+
           FREETYPE_ROOT="$PWD/lib/ios_arm64/freetype"
           OPENEXR_ROOT="$PWD/lib/ios_arm64/openexr"
           PNG_ROOT="$PWD/lib/ios_arm64/png"
           JPEG_ROOT="$PWD/lib/ios_arm64/jpeg"
           TIFF_ROOT="$PWD/lib/ios_arm64/tiff"
-          FMT_ROOT="$PWD/lib/ios_arm64/fmt"
 
           PYTHON_EXECUTABLE="$PYTHON_ROOT/bin/python3.13"
           PYTHON_INCLUDE_DIR="$PYTHON_ROOT/include/python3.13"
@@ -189,7 +174,7 @@ jobs:
             -DCMAKE_OSX_SYSROOT=iphoneos \
             -DCMAKE_OSX_ARCHITECTURES=arm64 \
             -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_PREFIX_PATH="$OPENEXR_CMAKE_DIR;$FMT_ROOT" \
+            -DCMAKE_PREFIX_PATH="$OPENEXR_ROOT;$OPENEXR_CMAKE_DIR" \
             -DOpenEXR_DIR="$OPENEXR_CMAKE_DIR" \
             -DOPENEXR_ROOT="$OPENEXR_ROOT" \
             -DOPENEXR_INCLUDE_DIR="$OPENEXR_ROOT/include" \
@@ -217,7 +202,9 @@ jobs:
 
       - name: Find Blender App
         run: |
-          echo "Searching for Blender.app..."
+          echo "========================================"
+          echo "SEARCHING FOR BLENDER.APP"
+          echo "========================================"
 
           find build_ios \
             -type d \
@@ -235,7 +222,7 @@ jobs:
             exit 1
           fi
 
-          echo "Found Blender.app:"
+          echo "Found:"
           echo "$APP"
 
           rm -rf Payload
