@@ -19,7 +19,11 @@ jobs:
           submodules: recursive
           lfs: false
 
-      - name: Fetch Blender LFS data
+      - name: Install Build Tools
+        run: |
+          brew install cmake ninja
+
+      - name: Fetch Blender Libraries
         run: |
           git lfs install --local
           ./build_files/utils/make_update.py --no-libraries
@@ -40,80 +44,67 @@ jobs:
           git lfs install
           git lfs pull
 
-      - name: Install Development Tools
-        run: |
-          brew install cmake ninja
-
-      - name: Setup macOS Environment Paths
-        run: |
-          echo "/opt/homebrew/bin" >> $GITHUB_PATH
-
       - name: Show Apple Toolchain
         run: |
+          echo "=== Xcode ==="
           xcodebuild -version
+
+          echo "=== iOS SDK ==="
           xcrun --sdk iphoneos --show-sdk-path
+
+          echo "=== CMake ==="
           cmake --version
+
+          echo "=== Ninja ==="
           ninja --version
 
       - name: Verify Required Libraries
         run: |
-          echo "=== iOS libraries ==="
-          ls -la lib/ios_arm64
+          echo "=== Python ==="
+          PYTHON_ROOT="$PWD/lib/macos_arm64/python"
+          echo "$PYTHON_ROOT/bin/python3.13"
+          echo "$PYTHON_ROOT/include/python3.13"
+          echo "$PYTHON_ROOT/lib/libpython3.13.a"
+
+          echo ""
+          echo "=== FreeType ==="
+          echo "$PWD/lib/ios_arm64/freetype/include/freetype2"
+          echo "$PWD/lib/ios_arm64/freetype/lib/libfreetype.a"
 
           echo ""
           echo "=== OpenEXR ==="
-          find "$PWD/lib/ios_arm64/openexr" -maxdepth 4 -type f -print | sort
+          find "$PWD/lib/ios_arm64/openexr" \
+            -maxdepth 8 \
+            -type f \
+            \( -name "OpenEXRConfig.cmake" \
+            -o -name "openexr-config.cmake" \
+            -o -name "*.cps" \) \
+            -print
 
           echo ""
           echo "=== PNG ==="
-          find "$PWD/lib/ios_arm64/png" -maxdepth 4 -type f -print | sort
+          echo "$PWD/lib/ios_arm64/png/include"
+          echo "$PWD/lib/ios_arm64/png/lib/libpng16.a"
 
           echo ""
           echo "=== JPEG ==="
-          find "$PWD/lib/ios_arm64/jpeg" -maxdepth 4 -type f -print | sort
+          echo "$PWD/lib/ios_arm64/jpeg/include"
+          echo "$PWD/lib/ios_arm64/jpeg/lib/libjpeg.a"
 
           echo ""
           echo "=== TIFF ==="
-          find "$PWD/lib/ios_arm64/tiff" -maxdepth 4 -type f -print | sort
+          echo "$PWD/lib/ios_arm64/tiff/include"
+          echo "$PWD/lib/ios_arm64/tiff/lib/libtiff.a"
 
-      - name: Create OpenEXR CMake Package
-        run: |
-          OPENEXR_ROOT="$PWD/lib/ios_arm64/openexr"
-
-          mkdir -p "$OPENEXR_ROOT/lib/cmake/OpenEXR"
-
-          cat > "$OPENEXR_ROOT/lib/cmake/OpenEXR/OpenEXRConfig.cmake" <<'EOF'
-          set(OpenEXR_FOUND TRUE)
-
-          set(OpenEXR_INCLUDE_DIRS
-            "${CMAKE_CURRENT_LIST_DIR}/../../../include"
-          )
-
-          set(OpenEXR_LIBRARIES
-            "${CMAKE_CURRENT_LIST_DIR}/../../../lib/libOpenEXR.dylib"
-            "${CMAKE_CURRENT_LIST_DIR}/../../../lib/libOpenEXRCore.dylib"
-            "${CMAKE_CURRENT_LIST_DIR}/../../../lib/libOpenEXRUtil.dylib"
-            "${CMAKE_CURRENT_LIST_DIR}/../../../lib/libIex.dylib"
-            "${CMAKE_CURRENT_LIST_DIR}/../../../lib/libIlmThread.dylib"
-          )
-
-          if(NOT TARGET OpenEXR::OpenEXR)
-            add_library(OpenEXR::OpenEXR UNKNOWN IMPORTED)
-            set_target_properties(OpenEXR::OpenEXR PROPERTIES
-              IMPORTED_LOCATION "${CMAKE_CURRENT_LIST_DIR}/../../../lib/libOpenEXR.dylib"
-              INTERFACE_INCLUDE_DIRECTORIES "${CMAKE_CURRENT_LIST_DIR}/../../../include"
-            )
-          endif()
-          EOF
-
-          cat > "$OPENEXR_ROOT/lib/cmake/OpenEXR/OpenEXRConfigVersion.cmake" <<'EOF'
-          set(PACKAGE_VERSION "3.2.4")
-          set(PACKAGE_VERSION_COMPATIBLE TRUE)
-          set(PACKAGE_VERSION_EXACT TRUE)
-          EOF
-
-          echo "=== Created OpenEXR package ==="
-          cat "$OPENEXR_ROOT/lib/cmake/OpenEXR/OpenEXRConfig.cmake"
+          echo ""
+          echo "=== fmt ==="
+          find "$PWD/lib/ios_arm64" \
+            -maxdepth 8 \
+            -type f \
+            \( -name "fmtConfig.cmake" \
+            -o -name "fmt-config.cmake" \
+            -o -name "*.cps" \) \
+            -print
 
       - name: Configure iOS Build
         run: |
@@ -143,6 +134,11 @@ jobs:
           TIFF_INCLUDE_DIR="$TIFF_ROOT/include"
           TIFF_LIBRARY="$TIFF_ROOT/lib/libtiff.a"
 
+          echo "========================================"
+          echo "BUILD CONFIGURATION"
+          echo "========================================"
+
+          echo ""
           echo "=== Python ==="
           echo "$PYTHON_EXECUTABLE"
           echo "$PYTHON_INCLUDE_DIR"
@@ -179,16 +175,10 @@ jobs:
           test -f "$FREETYPE_INCLUDE_DIR/ft2build.h"
           test -f "$FREETYPE_LIBRARY"
 
-          test -f "$OPENEXR_ROOT/include/OpenEXR/ImfRgba.h"
-          test -f "$OPENEXR_ROOT/lib/libOpenEXR.dylib"
+          test -d "$OPENEXR_DIR"
 
-          test -f "$PNG_INCLUDE_DIR/png.h"
           test -f "$PNG_LIBRARY"
-
-          test -f "$JPEG_INCLUDE_DIR/jpeglib.h"
           test -f "$JPEG_LIBRARY"
-
-          test -f "$TIFF_INCLUDE_DIR/tiff.h"
           test -f "$TIFF_LIBRARY"
 
           "$PYTHON_EXECUTABLE" --version
@@ -201,11 +191,8 @@ jobs:
             -DCMAKE_OSX_SYSROOT=iphoneos \
             -DCMAKE_OSX_ARCHITECTURES=arm64 \
             -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_PREFIX_PATH="$OPENEXR_ROOT;$PNG_ROOT;$JPEG_ROOT;$TIFF_ROOT" \
+            -DCMAKE_PREFIX_PATH="$PWD/lib/ios_arm64" \
             -DOpenEXR_DIR="$OPENEXR_DIR" \
-            -DOPENEXR_ROOT_DIR="$OPENEXR_ROOT" \
-            -DOPENEXR_INCLUDE_DIR="$OPENEXR_ROOT/include" \
-            -DOPENEXR_LIBRARY="$OPENEXR_ROOT/lib/libOpenEXR.dylib" \
             -DPYTHON_VERSION=3.13 \
             -DPYTHON_EXECUTABLE="$PYTHON_EXECUTABLE" \
             -DPYTHON_INCLUDE_DIR="$PYTHON_INCLUDE_DIR" \
@@ -213,7 +200,7 @@ jobs:
             -DPYTHON_INCLUDE_CONFIG_DIR="$PYTHON_INCLUDE_CONFIG_DIR" \
             -DFREETYPE_INCLUDE_DIRS="$FREETYPE_INCLUDE_DIR" \
             -DFREETYPE_LIBRARY="$FREETYPE_LIBRARY" \
-            -DPNG_INCLUDE_DIR="$PNG_INCLUDE_DIR" \
+            -DPNG_PNG_INCLUDE_DIR="$PNG_INCLUDE_DIR" \
             -DPNG_LIBRARY="$PNG_LIBRARY" \
             -DJPEG_INCLUDE_DIR="$JPEG_INCLUDE_DIR" \
             -DJPEG_LIBRARY="$JPEG_LIBRARY" \
@@ -226,10 +213,14 @@ jobs:
             --config Release \
             --parallel $(sysctl -n hw.ncpu)
 
-      - name: Find Blender App
+      - name: Find Blender.app
         run: |
           echo "Searching for Blender.app..."
-          find build_ios -type d -name "Blender.app" -print
+
+          find build_ios \
+            -type d \
+            -name "Blender.app" \
+            -print
 
       - name: Package Unsigned IPA
         run: |
@@ -239,6 +230,9 @@ jobs:
             echo "ERROR: Blender.app was not produced."
             exit 1
           fi
+
+          echo "Found:"
+          echo "$APP"
 
           rm -rf Payload
           mkdir -p Payload
