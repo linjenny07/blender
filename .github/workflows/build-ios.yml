@@ -111,12 +111,48 @@ jobs:
 
       - name: Configure iOS build
         run: |
+          PYTHON_ROOT="$PWD/lib/macos_arm64/python"
+
+          echo "=== Python root ==="
+          echo "$PYTHON_ROOT"
+
+          echo "=== Python executable ==="
+          "$PYTHON_ROOT/bin/python3.13" --version
+          "$PYTHON_ROOT/bin/python3.13" -c "import sys; print(sys.prefix); print(sysconfig.get_paths() if False else '')"
+
+          echo "=== Python headers ==="
+          find "$PYTHON_ROOT" -name Python.h -print
+
+          echo "=== Python libraries ==="
+          find "$PYTHON_ROOT" \( -name "libpython3.13*" -o -name "Python.framework" \) -print
+
+          PYTHON_INCLUDE_DIR="$(find "$PYTHON_ROOT" -type f -name Python.h -print -quit)"
+          PYTHON_INCLUDE_DIR="$(dirname "$PYTHON_INCLUDE_DIR")"
+
+          PYTHON_LIBRARY="$(find "$PYTHON_ROOT" -type f \( -name 'libpython3.13*.a' -o -name 'libpython3.13*.dylib' \) -print -quit)"
+
+          echo "Python include: $PYTHON_INCLUDE_DIR"
+          echo "Python library: $PYTHON_LIBRARY"
+
+          if [ -z "$PYTHON_INCLUDE_DIR" ]; then
+            echo "ERROR: Python.h was not found."
+            exit 1
+          fi
+
+          if [ -z "$PYTHON_LIBRARY" ]; then
+            echo "ERROR: libpython3.13 was not found."
+            exit 1
+          fi
+
           cmake -S . -B build_ios \
             -G Xcode \
             -DCMAKE_SYSTEM_NAME=iOS \
             -DCMAKE_OSX_SYSROOT=iphoneos \
             -DCMAKE_OSX_ARCHITECTURES=arm64 \
-            -DCMAKE_BUILD_TYPE=Release
+            -DCMAKE_BUILD_TYPE=Release \
+            -DPYTHON_VERSION=3.13 \
+            -DPYTHON_INCLUDE_DIR="$PYTHON_INCLUDE_DIR" \
+            -DPYTHON_LIBRARY="$PYTHON_LIBRARY"
 
       - name: Build Blender
         run: |
