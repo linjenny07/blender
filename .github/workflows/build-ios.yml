@@ -42,16 +42,18 @@ jobs:
           ls -la lib/macos_arm64/python/bin || true
 
           echo "=== Python include directories ==="
-          find lib/macos_arm64/python -maxdepth 5 -type d -name "include" -print || true
+          find lib/macos_arm64/python -type d -name "include" -print
 
-          echo "=== Python headers ==="
-          find lib/macos_arm64/python -maxdepth 6 \( -name "Python.h" -o -name "pyconfig.h" \) -print || true
+          echo "=== Python.h ==="
+          find lib/macos_arm64/python -name "Python.h" -print
 
           echo "=== Python libraries ==="
-          find lib/macos_arm64/python -maxdepth 6 \( -name "*.a" -o -name "*.dylib" -o -name "Python.framework" -o -name "libpython*" \) -print || true
+          find lib/macos_arm64/python \( -name "libpython*" -o -name "Python.framework" \) -print
 
-          echo "=== Python config files ==="
-          find lib/macos_arm64/python -maxdepth 6 -iname "*python*config*" -print || true
+          echo "=== Python 3.13 files ==="
+          find lib/macos_arm64/python -maxdepth 5 \
+            \( -name "python3.13" -o -name "Python.h" -o -name "libpython3.13*" \) \
+            -print
 
       - name: Install build tools
         run: |
