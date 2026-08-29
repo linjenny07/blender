@@ -1,4 +1,4 @@
-name: Build Blender iOS IPA
+name: Build Blender iOS IPA - Dependency Investigation
 
 on:
   workflow_dispatch:
@@ -41,89 +41,135 @@ jobs:
         run: |
           git lfs install
 
+      - name: Show Source Revision
+        run: |
+          echo "========================================"
+          echo "SOURCE REVISION"
+          echo "========================================"
+
+          git rev-parse HEAD
+          git branch --show-current
+          git status --short
+
       - name: Fetch Blender Dependencies
         run: |
           set -e
 
+          echo "========================================"
+          echo "FETCHING BLENDER DEPENDENCIES"
+          echo "========================================"
+
           ./build_files/utils/make_update.py --use-ios-libraries
 
-      - name: Bootstrap Missing iOS Dependencies
+      - name: Inspect iOS Build Scripts
         run: |
-          set -e
-
           echo "========================================"
-          echo "BOOTSTRAPPING iOS DEPENDENCIES"
+          echo "IOS BUILD SCRIPTS"
           echo "========================================"
 
-          if [ ! -f lib/ios_arm64/fmt/include/fmt/core.h ]; then
-            echo "fmt is missing - bootstrapping..."
-            bash ./build_files/utils/bootstrap_ios_fmt.sh
-          else
-            echo "fmt already present."
-          fi
+          echo ""
+          echo "Files in build_files/utils:"
+          find build_files/utils \
+            -maxdepth 1 \
+            -type f \
+            -print \
+            | sort
 
-          if [ ! -f lib/ios_arm64/eigen/share/eigen3/cmake/Eigen3Config.cmake ]; then
-            echo "Eigen is missing - bootstrapping..."
-            bash ./build_files/utils/bootstrap_ios_eigen.sh
-          else
-            echo "Eigen already present."
-          fi
+          echo ""
+          echo "iOS-related scripts/files:"
+          find build_files \
+            -type f \
+            \( \
+              -iname "*ios*" \
+              -o -iname "*fmt*" \
+              -o -iname "*eigen*" \
+            \) \
+            -print \
+            | sort \
+            | head -300
 
-      - name: Verify iOS Dependencies
+      - name: Inspect iOS Library
         run: |
-          set -e
-
           echo "========================================"
-          echo "VERIFYING iOS DEPENDENCIES"
+          echo "IOS LIBRARY"
           echo "========================================"
 
-          echo ""
-          echo "=== iOS Library Root ==="
-          ls -la lib/ios_arm64
-
-          echo ""
-          echo "=== fmt ==="
-
-          if [ -f lib/ios_arm64/fmt/include/fmt/core.h ]; then
-            echo "OK: fmt"
-          else
-            echo "ERROR: fmt is missing."
+          if [ ! -d "lib/ios_arm64" ]; then
+            echo "ERROR: lib/ios_arm64 does not exist."
             exit 1
           fi
 
           echo ""
-          echo "=== Eigen ==="
+          echo "Top-level iOS libraries:"
+          find lib/ios_arm64 \
+            -mindepth 1 \
+            -maxdepth 1 \
+            -type d \
+            -print \
+            | sort
 
-          if [ -f lib/ios_arm64/eigen/share/eigen3/cmake/Eigen3Config.cmake ]; then
-            echo "OK: Eigen"
+          echo ""
+          echo "fmt:"
+          if [ -d "lib/ios_arm64/fmt" ]; then
+            find lib/ios_arm64/fmt \
+              -maxdepth 5 \
+              -type f \
+              -print \
+              | head -100
           else
-            echo "ERROR: Eigen is missing."
-            exit 1
+            echo "fmt directory does not exist."
           fi
 
           echo ""
-          echo "=== OpenEXR ==="
-
-          if [ -d lib/ios_arm64/openexr ]; then
-            echo "OK: OpenEXR directory exists."
+          echo "Eigen:"
+          if [ -d "lib/ios_arm64/eigen" ]; then
+            find lib/ios_arm64/eigen \
+              -maxdepth 5 \
+              -type f \
+              -print \
+              | head -100
           else
-            echo "ERROR: OpenEXR directory is missing."
-            exit 1
+            echo "Eigen directory does not exist."
           fi
 
           echo ""
-          echo "=== Python ==="
+          echo "OpenEXR:"
+          if [ -d "lib/ios_arm64/openexr" ]; then
+            find lib/ios_arm64/openexr \
+              -maxdepth 5 \
+              -type f \
+              -print \
+              | head -150
+          else
+            echo "OpenEXR directory does not exist."
+          fi
 
-          if [ -x lib/macos_arm64/python/bin/python3.13 ]; then
-            echo "OK: Host Python"
+      - name: Inspect Dependency References
+        run: |
+          echo "========================================"
+          echo "DEPENDENCY REFERENCES"
+          echo "========================================"
+
+          grep -Rni \
+            --exclude-dir=.git \
+            -E "ios_arm64|bootstrap_ios|fmt|eigen|OpenEXR" \
+            build_files \
+            CMakeLists.txt \
+            2>/dev/null \
+            | head -400 || true
+
+      - name: Verify Host Python
+        run: |
+          echo "========================================"
+          echo "HOST PYTHON"
+          echo "========================================"
+
+          if [ -x "lib/macos_arm64/python/bin/python3.13" ]; then
+            echo "Found Blender host Python:"
             lib/macos_arm64/python/bin/python3.13 --version
           else
-            echo "ERROR: Host Python is missing."
-            exit 1
+            echo "Host Python 3.13 was not found."
           fi
-
-          echo ""
-          echo "Dependency verification complete."
 
       - name: Show Apple Toolchain
         run: |
@@ -153,13 +199,16 @@ jobs:
         run: |
           set -e
 
-          rm -rf build_ios
-
           echo "========================================"
           echo "GENERATING XCODE PROJECT"
           echo "========================================"
 
-          cmake -G Xcode -S . -B build_ios
+          rm -rf build_ios
+
+          cmake \
+            -G Xcode \
+            -S . \
+            -B build_ios
 
       - name: List Xcode Targets
         run: |
@@ -195,7 +244,7 @@ jobs:
           set -e
 
           echo "========================================"
-          echo "BUILDING BLENDER FOR iOS"
+          echo "BUILDING BLENDER FOR IOS"
           echo "========================================"
 
           xcodebuild \
@@ -224,16 +273,13 @@ jobs:
         run: |
           set -e
 
-          echo "========================================"
-          echo "PACKAGING IPA"
-          echo "========================================"
-
           APP="build_ios/bin/Release/Blender.app"
 
           if [ ! -d "$APP" ]; then
-            echo "Expected Blender.app was not found."
-            echo "Searching build directory..."
+            echo "ERROR: Blender.app was not produced."
 
+            echo ""
+            echo "Searching for any .app:"
             find build_ios \
               -type d \
               -name "*.app" \
@@ -264,7 +310,7 @@ jobs:
           cd ..
 
           echo ""
-          echo "IPA created:"
+          echo "IPA:"
           ls -lh Blender-iPad-unsigned.ipa
 
       - name: Upload IPA
@@ -274,11 +320,11 @@ jobs:
           path: Blender-iPad-unsigned.ipa
           retention-days: 30
 
-      - name: Upload Build Logs
+      - name: Upload Diagnostics on Failure
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: blender-ios-build-logs
+          name: blender-ios-build-diagnostics
           path: |
             cross_tools_build.log
             ios_build.log
