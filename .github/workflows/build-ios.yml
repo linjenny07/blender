@@ -48,85 +48,84 @@ jobs:
           git lfs install
           git lfs pull
 
-      - name: Locate Dependency Configurations
+      - name: Inspect OpenEXR Libraries
         run: |
           set -e
 
           IOS_ROOT="$PWD/lib/ios_arm64"
-          MACOS_ROOT="$PWD/lib/macos_arm64"
+          OPENEXR_ROOT="$IOS_ROOT/openexr"
 
           echo "========================================"
-          echo "LOCATING DEPENDENCY CONFIGURATIONS"
+          echo "OPENEXR LIBRARY INSPECTION"
           echo "========================================"
 
           echo ""
-          echo "=== OpenEXR ==="
-
-          OPENEXR_CONFIG="$(find "$IOS_ROOT/openexr" \
-            -type f \
-            -name 'OpenEXRConfig.cmake' \
+          echo "=== OpenEXR directories ==="
+          find "$OPENEXR_ROOT" \
+            -maxdepth 5 \
+            -type d \
             -print \
-            -quit 2>/dev/null || true)"
-
-          if [ -z "$OPENEXR_CONFIG" ]; then
-            echo "ERROR: OpenEXRConfig.cmake was not found."
-            echo ""
-            echo "OpenEXR directory contents:"
-            find "$IOS_ROOT/openexr" -maxdepth 6 -type f -print | sort
-            exit 1
-          fi
-
-          OPENEXR_DIR="$(dirname "$OPENEXR_CONFIG")"
-
-          echo "OpenEXR config:"
-          echo "$OPENEXR_CONFIG"
-
-          echo "OpenEXR CMake directory:"
-          echo "$OPENEXR_DIR"
+            | sort
 
           echo ""
-          echo "=== fmt ==="
-
-          FMT_CONFIG="$(find "$IOS_ROOT/fmt" \
+          echo "=== OpenEXR libraries ==="
+          find "$OPENEXR_ROOT" \
             -type f \
             \( \
-              -name 'fmtConfig.cmake' \
-              -o -name 'fmt-config.cmake' \
+              -name "*.a" \
+              -o -name "*.dylib" \
+              -o -name "*.tbd" \
             \) \
             -print \
-            -quit 2>/dev/null || true)"
-
-          if [ -z "$FMT_CONFIG" ]; then
-            echo "fmt package configuration was not found."
-            echo "This may be acceptable if the Blender branch does not require it."
-          else
-            FMT_DIR="$(dirname "$FMT_CONFIG")"
-
-            echo "fmt config:"
-            echo "$FMT_CONFIG"
-
-            echo "fmt CMake directory:"
-            echo "$FMT_DIR"
-          fi
+            | sort
 
           echo ""
-          echo "=== All CMake package configs under iOS libraries ==="
-
-          find "$IOS_ROOT" \
+          echo "=== OpenEXR CMake files ==="
+          find "$OPENEXR_ROOT" \
             -type f \
             \( \
-              -name '*Config.cmake' \
-              -o -name '*-config.cmake' \
-              -o -name '*.cps' \
+              -name "*.cmake" \
+              -o -name "*.cps" \
             \) \
             -print \
-            2>/dev/null | sort | head -200
+            | sort
+
+          echo ""
+          echo "=== OpenEXR headers ==="
+          find "$OPENEXR_ROOT/include" \
+            -type f \
+            -name "*.h" \
+            -print \
+            | sort
+
+          echo ""
+          echo "=== Checking expected libraries ==="
+
+          for lib in \
+            libOpenEXR.a \
+            libOpenEXRCore.a \
+            libIlmImf.a \
+            libIex.a \
+            libIlmThread.a
+          do
+            FOUND="$(find "$OPENEXR_ROOT" \
+              -type f \
+              -name "$lib" \
+              -print \
+              -quit)"
+
+            if [ -n "$FOUND" ]; then
+              echo "FOUND: $FOUND"
+            else
+              echo "MISSING: $lib"
+            fi
+          done
 
           echo ""
           echo "========================================"
-          echo "DEPENDENCY DISCOVERY COMPLETE"
+          echo "OPENEXR INSPECTION COMPLETE"
           echo "========================================"
-
+          
       - name: Show Apple Toolchain
         run: |
           set -e
