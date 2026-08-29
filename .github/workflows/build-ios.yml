@@ -30,90 +30,127 @@ jobs:
       - name: Fetch iOS Libraries
         run: |
           rm -rf lib/ios_arm64
+
           git clone https://projects.blender.org/blender/lib-ios_arm64.git lib/ios_arm64
+
           cd lib/ios_arm64
           git checkout 393201c7c8525941553f6a96e19b909d6b3bfc4f
 
       - name: Fetch macOS ARM64 Libraries
         run: |
           rm -rf lib/macos_arm64
+
           git clone https://projects.blender.org/blender/lib-macos_arm64.git lib/macos_arm64
+
           cd lib/macos_arm64
           git checkout a241b11
+
           git lfs install
           git lfs pull
 
-      - name: Inspect OpenEXR
+      - name: Locate Dependency Configurations
         run: |
+          set -e
+
+          IOS_ROOT="$PWD/lib/ios_arm64"
+          MACOS_ROOT="$PWD/lib/macos_arm64"
+
           echo "========================================"
-          echo "OPENEXR DIAGNOSTIC"
+          echo "LOCATING DEPENDENCY CONFIGURATIONS"
           echo "========================================"
 
-          OPENEXR_ROOT="$PWD/lib/ios_arm64/openexr"
-
           echo ""
-          echo "OpenEXR root:"
-          echo "$OPENEXR_ROOT"
+          echo "=== OpenEXR ==="
 
-          echo ""
-          echo "OpenEXR directories:"
-          find "$OPENEXR_ROOT" -type d -maxdepth 5 | sort
-
-          echo ""
-          echo "OpenEXR CMake/config files:"
-          find "$OPENEXR_ROOT" -type f \
-            \( \
-              -name "*.cmake" \
-              -o -name "*.cps" \
-              -o -name "*Config.cmake" \
-              -o -name "*config.cmake" \
-            \) \
-            -print | sort
-
-          echo ""
-          echo "OpenEXR libraries:"
-          find "$OPENEXR_ROOT" -type f \
-            \( \
-              -name "*.a" \
-              -o -name "*.dylib" \
-            \) \
-            -print | sort
-
-          echo ""
-          echo "OpenEXR headers:"
-          find "$OPENEXR_ROOT/include" \
+          OPENEXR_CONFIG="$(find "$IOS_ROOT/openexr" \
             -type f \
-            -name "*.h" \
-            -maxdepth 3 \
-            -print | head -50
+            -name 'OpenEXRConfig.cmake' \
+            -print \
+            -quit 2>/dev/null || true)"
 
-      - name: Inspect fmt
-        run: |
-          echo "========================================"
-          echo "FMT DIAGNOSTIC"
-          echo "========================================"
-
-          FMT_ROOT="$PWD/lib/ios_arm64/fmt"
-
-          if [ -d "$FMT_ROOT" ]; then
-            echo "fmt directory exists:"
-            find "$FMT_ROOT" -maxdepth 5 -type f -print | head -100
-          else
-            echo "fmt directory does not exist"
+          if [ -z "$OPENEXR_CONFIG" ]; then
+            echo "ERROR: OpenEXRConfig.cmake was not found."
+            echo ""
+            echo "OpenEXR directory contents:"
+            find "$IOS_ROOT/openexr" -maxdepth 6 -type f -print | sort
+            exit 1
           fi
+
+          OPENEXR_DIR="$(dirname "$OPENEXR_CONFIG")"
+
+          echo "OpenEXR config:"
+          echo "$OPENEXR_CONFIG"
+
+          echo "OpenEXR CMake directory:"
+          echo "$OPENEXR_DIR"
+
+          echo ""
+          echo "=== fmt ==="
+
+          FMT_CONFIG="$(find "$IOS_ROOT/fmt" \
+            -type f \
+            \( \
+              -name 'fmtConfig.cmake' \
+              -o -name 'fmt-config.cmake' \
+            \) \
+            -print \
+            -quit 2>/dev/null || true)"
+
+          if [ -z "$FMT_CONFIG" ]; then
+            echo "fmt package configuration was not found."
+            echo "This may be acceptable if the Blender branch does not require it."
+          else
+            FMT_DIR="$(dirname "$FMT_CONFIG")"
+
+            echo "fmt config:"
+            echo "$FMT_CONFIG"
+
+            echo "fmt CMake directory:"
+            echo "$FMT_DIR"
+          fi
+
+          echo ""
+          echo "=== All CMake package configs under iOS libraries ==="
+
+          find "$IOS_ROOT" \
+            -type f \
+            \( \
+              -name '*Config.cmake' \
+              -o -name '*-config.cmake' \
+              -o -name '*.cps' \
+            \) \
+            -print \
+            2>/dev/null | sort | head -200
+
+          echo ""
+          echo "========================================"
+          echo "DEPENDENCY DISCOVERY COMPLETE"
+          echo "========================================"
 
       - name: Show Apple Toolchain
         run: |
+          set -e
+
           echo "========================================"
           echo "APPLE TOOLCHAIN"
           echo "========================================"
 
           xcodebuild -version
+
           echo ""
+
           xcrun --sdk iphoneos --show-sdk-path
+
           echo ""
+
+          xcrun --sdk iphoneos --show-sdk-version
+
+          echo ""
+
           cmake --version
+
           echo ""
+
           ninja --version
 
       - name: Configure iOS Build
@@ -148,46 +185,61 @@ jobs:
           TIFF_LIBRARY="$TIFF_ROOT/lib/libtiff.a"
 
           echo "========================================"
-          echo "BUILD CONFIGURATION"
+          echo "LOCATING OPENEXR"
           echo "========================================"
 
-          echo ""
-          echo "iOS library root:"
-          echo "$IOS_ROOT"
+          OPENEXR_CONFIG="$(find "$OPENEXR_ROOT" \
+            -type f \
+            -name 'OpenEXRConfig.cmake' \
+            -print \
+            -quit 2>/dev/null || true)"
 
-          echo ""
-          echo "Python:"
-          echo "$PYTHON_EXECUTABLE"
-          echo "$PYTHON_INCLUDE_DIR"
-          echo "$PYTHON_LIBRARY"
+          if [ -z "$OPENEXR_CONFIG" ]; then
+            echo "ERROR: OpenEXRConfig.cmake was not found."
+            exit 1
+          fi
 
-          echo ""
-          echo "FreeType:"
-          echo "$FREETYPE_INCLUDE_DIR"
-          echo "$FREETYPE_LIBRARY"
+          OPENEXR_DIR="$(dirname "$OPENEXR_CONFIG")"
 
-          echo ""
-          echo "OpenEXR:"
+          echo "OpenEXR root:"
           echo "$OPENEXR_ROOT"
 
-          echo ""
-          echo "PNG:"
-          echo "$PNG_INCLUDE_DIR"
-          echo "$PNG_LIBRARY"
+          echo "OpenEXR config:"
+          echo "$OPENEXR_CONFIG"
 
-          echo ""
-          echo "JPEG:"
-          echo "$JPEG_INCLUDE_DIR"
-          echo "$JPEG_LIBRARY"
-
-          echo ""
-          echo "TIFF:"
-          echo "$TIFF_INCLUDE_DIR"
-          echo "$TIFF_LIBRARY"
+          echo "OpenEXR CMake directory:"
+          echo "$OPENEXR_DIR"
 
           echo ""
           echo "========================================"
-          echo "CHECKING REQUIRED FILES"
+          echo "LOCATING FMT"
+          echo "========================================"
+
+          FMT_CONFIG="$(find "$IOS_ROOT/fmt" \
+            -type f \
+            \( \
+              -name 'fmtConfig.cmake' \
+              -o -name 'fmt-config.cmake' \
+            \) \
+            -print \
+            -quit 2>/dev/null || true)"
+
+          if [ -n "$FMT_CONFIG" ]; then
+            FMT_DIR="$(dirname "$FMT_CONFIG")"
+
+            echo "fmt config:"
+            echo "$FMT_CONFIG"
+
+            echo "fmt CMake directory:"
+            echo "$FMT_DIR"
+          else
+            echo "fmt package config not found."
+            FMT_DIR=""
+          fi
+
+          echo ""
+          echo "========================================"
+          echo "VERIFYING DEPENDENCIES"
           echo "========================================"
 
           test -x "$PYTHON_EXECUTABLE"
@@ -197,9 +249,7 @@ jobs:
           test -f "$FREETYPE_INCLUDE_DIR/ft2build.h"
           test -f "$FREETYPE_LIBRARY"
 
-          test -d "$OPENEXR_ROOT"
-          test -d "$OPENEXR_ROOT/include"
-          test -d "$OPENEXR_ROOT/lib"
+          test -f "$OPENEXR_CONFIG"
 
           test -f "$PNG_INCLUDE_DIR/png.h"
           test -f "$PNG_LIBRARY"
@@ -211,9 +261,11 @@ jobs:
           test -f "$TIFF_LIBRARY"
 
           echo ""
-          echo "All basic dependency files exist."
-
+          echo "Python:"
           "$PYTHON_EXECUTABLE" --version
+
+          echo ""
+          echo "All required dependency files found."
 
           rm -rf build_ios
 
@@ -222,18 +274,20 @@ jobs:
           echo "RUNNING CMAKE"
           echo "========================================"
 
+          CMAKE_PREFIXES="$IOS_ROOT;$OPENEXR_DIR"
+
+          if [ -n "$FMT_DIR" ]; then
+            CMAKE_PREFIXES="$CMAKE_PREFIXES;$FMT_DIR"
+          fi
+
           cmake -S . -B build_ios \
             -G Xcode \
             -DCMAKE_SYSTEM_NAME=iOS \
             -DCMAKE_OSX_SYSROOT=iphoneos \
             -DCMAKE_OSX_ARCHITECTURES=arm64 \
             -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_PREFIX_PATH="$IOS_ROOT" \
-            -DCMAKE_FIND_ROOT_PATH="$IOS_ROOT" \
-            -DCMAKE_FIND_ROOT_PATH_MODE_PROGRAM=NEVER \
-            -DCMAKE_FIND_ROOT_PATH_MODE_LIBRARY=ONLY \
-            -DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=ONLY \
-            -DCMAKE_FIND_ROOT_PATH_MODE_PACKAGE=ONLY \
+            -DCMAKE_PREFIX_PATH="$CMAKE_PREFIXES" \
+            -DOpenEXR_DIR="$OPENEXR_DIR" \
             -DPYTHON_VERSION=3.13 \
             -DPYTHON_EXECUTABLE="$PYTHON_EXECUTABLE" \
             -DPYTHON_INCLUDE_DIR="$PYTHON_INCLUDE_DIR" \
@@ -262,6 +316,8 @@ jobs:
 
       - name: Find Blender App
         run: |
+          set -e
+
           echo "========================================"
           echo "SEARCHING FOR BLENDER.APP"
           echo "========================================"
@@ -275,7 +331,11 @@ jobs:
         run: |
           set -e
 
-          APP="$(find build_ios -type d -name "Blender.app" -print -quit)"
+          APP="$(find build_ios \
+            -type d \
+            -name "Blender.app" \
+            -print \
+            -quit)"
 
           if [ -z "$APP" ]; then
             echo "ERROR: Blender.app was not produced."
