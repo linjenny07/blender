@@ -147,6 +147,53 @@ jobs:
           echo "Ninja:"
           ninja --version
 
+      - name: Diagnose OpenEXR
+        run: |
+          set -e
+
+          ROOT="$PWD/lib/ios_arm64/openexr"
+
+          echo "========================================"
+          echo "OPENEXR FINAL DIAGNOSTIC"
+          echo "========================================"
+
+          echo ""
+          echo "Root:"
+          echo "$ROOT"
+
+          echo ""
+          echo "CMake files:"
+          find "$ROOT" -type f \
+            \( \
+              -name "OpenEXRConfig.cmake" \
+              -o -name "openexr-config.cmake" \
+              -o -name "OpenEXR.cmake" \
+              -o -name "*.cps" \
+            \) \
+            -print | sort
+
+          echo ""
+          echo "Libraries:"
+          find "$ROOT" -type f \
+            \( \
+              -name "*.a" \
+              -o -name "*.dylib" \
+            \) \
+            -print | sort
+
+          echo ""
+          echo "Directories:"
+          find "$ROOT" -maxdepth 4 -type d -print | sort
+
+      - name: Inspect OpenEXR CMake Logic
+        run: |
+          echo "========================================"
+          echo "BLENDER OPENEXR CMAKE LOGIC"
+          echo "========================================"
+
+          sed -n '320,365p' \
+            build_files/cmake/platform/platform_apple.cmake
+
       - name: Generate Xcode Project
         run: |
           set -e
