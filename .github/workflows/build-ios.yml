@@ -1,135 +1,131 @@
-name: Compile Latest Blender iPad App
+name: Build Blender iOS IPA
 
 on:
-  push:
   workflow_dispatch:
 
 jobs:
-  build-ios:
-    runs-on: macos-26
+  build:
+    runs-on: macos-latest
+    timeout-minutes: 180
 
     steps:
-      - name: Checkout Blender Source
+      - name: Checkout Blender iOS Source
         uses: actions/checkout@v4
         with:
-          repository: linjenny07/blender
           ref: ios
-          submodules: recursive
+          fetch-depth: 1
           lfs: false
+          submodules: recursive
 
-      - name: Install Build Tools
+      - name: Free Disk Space
         run: |
-          brew install cmake ninja
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf ~/Library/Android
+          sudo rm -rf /opt/ghc
+          sudo rm -rf /usr/local/.ghcup
+          sudo rm -rf /Library/Developer/CoreSimulator/Profiles
+
+          sudo xcrun simctl delete all 2>/dev/null || true
+
+          df -h
+
+      - name: Install Host Build Tools
+        run: |
+          brew install git-lfs cmake ninja
+
           echo "/opt/homebrew/bin" >> "$GITHUB_PATH"
 
-      - name: Fetch Blender Libraries
+      - name: Initialize Git LFS
         run: |
-          git lfs install --local
-          ./build_files/utils/make_update.py --no-libraries
-
-      - name: Fetch iOS Libraries
-        run: |
-          rm -rf lib/ios_arm64
-
-          git clone https://projects.blender.org/blender/lib-ios_arm64.git lib/ios_arm64
-
-          cd lib/ios_arm64
-          git checkout 393201c7c8525941553f6a96e19b909d6b3bfc4f
-
-      - name: Fetch macOS ARM64 Libraries
-        run: |
-          rm -rf lib/macos_arm64
-
-          git clone https://projects.blender.org/blender/lib-macos_arm64.git lib/macos_arm64
-
-          cd lib/macos_arm64
-          git checkout a241b11
-
           git lfs install
-          git lfs pull
 
-      - name: Inspect OpenEXR Libraries
+      - name: Fetch Blender Dependencies
         run: |
           set -e
 
-          IOS_ROOT="$PWD/lib/ios_arm64"
-          OPENEXR_ROOT="$IOS_ROOT/openexr"
+          ./build_files/utils/make_update.py --use-ios-libraries
+
+      - name: Bootstrap Missing iOS Dependencies
+        run: |
+          set -e
 
           echo "========================================"
-          echo "OPENEXR LIBRARY INSPECTION"
+          echo "BOOTSTRAPPING iOS DEPENDENCIES"
+          echo "========================================"
+
+          if [ ! -f lib/ios_arm64/fmt/include/fmt/core.h ]; then
+            echo "fmt is missing - bootstrapping..."
+            bash ./build_files/utils/bootstrap_ios_fmt.sh
+          else
+            echo "fmt already present."
+          fi
+
+          if [ ! -f lib/ios_arm64/eigen/share/eigen3/cmake/Eigen3Config.cmake ]; then
+            echo "Eigen is missing - bootstrapping..."
+            bash ./build_files/utils/bootstrap_ios_eigen.sh
+          else
+            echo "Eigen already present."
+          fi
+
+      - name: Verify iOS Dependencies
+        run: |
+          set -e
+
+          echo "========================================"
+          echo "VERIFYING iOS DEPENDENCIES"
           echo "========================================"
 
           echo ""
-          echo "=== OpenEXR directories ==="
-          find "$OPENEXR_ROOT" \
-            -maxdepth 5 \
-            -type d \
-            -print \
-            | sort
+          echo "=== iOS Library Root ==="
+          ls -la lib/ios_arm64
 
           echo ""
-          echo "=== OpenEXR libraries ==="
-          find "$OPENEXR_ROOT" \
-            -type f \
-            \( \
-              -name "*.a" \
-              -o -name "*.dylib" \
-              -o -name "*.tbd" \
-            \) \
-            -print \
-            | sort
+          echo "=== fmt ==="
+
+          if [ -f lib/ios_arm64/fmt/include/fmt/core.h ]; then
+            echo "OK: fmt"
+          else
+            echo "ERROR: fmt is missing."
+            exit 1
+          fi
 
           echo ""
-          echo "=== OpenEXR CMake files ==="
-          find "$OPENEXR_ROOT" \
-            -type f \
-            \( \
-              -name "*.cmake" \
-              -o -name "*.cps" \
-            \) \
-            -print \
-            | sort
+          echo "=== Eigen ==="
+
+          if [ -f lib/ios_arm64/eigen/share/eigen3/cmake/Eigen3Config.cmake ]; then
+            echo "OK: Eigen"
+          else
+            echo "ERROR: Eigen is missing."
+            exit 1
+          fi
 
           echo ""
-          echo "=== OpenEXR headers ==="
-          find "$OPENEXR_ROOT/include" \
-            -type f \
-            -name "*.h" \
-            -print \
-            | sort
+          echo "=== OpenEXR ==="
+
+          if [ -d lib/ios_arm64/openexr ]; then
+            echo "OK: OpenEXR directory exists."
+          else
+            echo "ERROR: OpenEXR directory is missing."
+            exit 1
+          fi
 
           echo ""
-          echo "=== Checking expected libraries ==="
+          echo "=== Python ==="
 
-          for lib in \
-            libOpenEXR.a \
-            libOpenEXRCore.a \
-            libIlmImf.a \
-            libIex.a \
-            libIlmThread.a
-          do
-            FOUND="$(find "$OPENEXR_ROOT" \
-              -type f \
-              -name "$lib" \
-              -print \
-              -quit)"
-
-            if [ -n "$FOUND" ]; then
-              echo "FOUND: $FOUND"
-            else
-              echo "MISSING: $lib"
-            fi
-          done
+          if [ -x lib/macos_arm64/python/bin/python3.13 ]; then
+            echo "OK: Host Python"
+            lib/macos_arm64/python/bin/python3.13 --version
+          else
+            echo "ERROR: Host Python is missing."
+            exit 1
+          fi
 
           echo ""
-          echo "========================================"
-          echo "OPENEXR INSPECTION COMPLETE"
-          echo "========================================"
-          
+          echo "Dependency verification complete."
+
       - name: Show Apple Toolchain
         run: |
-          set -e
-
           echo "========================================"
           echo "APPLE TOOLCHAIN"
           echo "========================================"
@@ -137,186 +133,83 @@ jobs:
           xcodebuild -version
 
           echo ""
+          echo "Developer directory:"
+          xcode-select -p
 
+          echo ""
+          echo "iPhoneOS SDK:"
           xcrun --sdk iphoneos --show-sdk-path
 
           echo ""
-
-          xcrun --sdk iphoneos --show-sdk-version
-
-          echo ""
-
+          echo "CMake:"
           cmake --version
 
           echo ""
-
+          echo "Ninja:"
           ninja --version
 
-      - name: Configure iOS Build
+      - name: Generate Xcode Project
         run: |
           set -e
-
-          IOS_ROOT="$PWD/lib/ios_arm64"
-          MACOS_ROOT="$PWD/lib/macos_arm64"
-
-          PYTHON_ROOT="$MACOS_ROOT/python"
-          FREETYPE_ROOT="$IOS_ROOT/freetype"
-          OPENEXR_ROOT="$IOS_ROOT/openexr"
-          PNG_ROOT="$IOS_ROOT/png"
-          JPEG_ROOT="$IOS_ROOT/jpeg"
-          TIFF_ROOT="$IOS_ROOT/tiff"
-
-          PYTHON_EXECUTABLE="$PYTHON_ROOT/bin/python3.13"
-          PYTHON_INCLUDE_DIR="$PYTHON_ROOT/include/python3.13"
-          PYTHON_LIBRARY="$PYTHON_ROOT/lib/libpython3.13.a"
-          PYTHON_INCLUDE_CONFIG_DIR="$PYTHON_ROOT/lib/python3.13/config-3.13-darwin"
-
-          FREETYPE_INCLUDE_DIR="$FREETYPE_ROOT/include/freetype2"
-          FREETYPE_LIBRARY="$FREETYPE_ROOT/lib/libfreetype.a"
-
-          PNG_INCLUDE_DIR="$PNG_ROOT/include"
-          PNG_LIBRARY="$PNG_ROOT/lib/libpng16.a"
-
-          JPEG_INCLUDE_DIR="$JPEG_ROOT/include"
-          JPEG_LIBRARY="$JPEG_ROOT/lib/libjpeg.a"
-
-          TIFF_INCLUDE_DIR="$TIFF_ROOT/include"
-          TIFF_LIBRARY="$TIFF_ROOT/lib/libtiff.a"
-
-          echo "========================================"
-          echo "LOCATING OPENEXR"
-          echo "========================================"
-
-          OPENEXR_CONFIG="$(find "$OPENEXR_ROOT" \
-            -type f \
-            -name 'OpenEXRConfig.cmake' \
-            -print \
-            -quit 2>/dev/null || true)"
-
-          if [ -z "$OPENEXR_CONFIG" ]; then
-            echo "ERROR: OpenEXRConfig.cmake was not found."
-            exit 1
-          fi
-
-          OPENEXR_DIR="$(dirname "$OPENEXR_CONFIG")"
-
-          echo "OpenEXR root:"
-          echo "$OPENEXR_ROOT"
-
-          echo "OpenEXR config:"
-          echo "$OPENEXR_CONFIG"
-
-          echo "OpenEXR CMake directory:"
-          echo "$OPENEXR_DIR"
-
-          echo ""
-          echo "========================================"
-          echo "LOCATING FMT"
-          echo "========================================"
-
-          FMT_CONFIG="$(find "$IOS_ROOT/fmt" \
-            -type f \
-            \( \
-              -name 'fmtConfig.cmake' \
-              -o -name 'fmt-config.cmake' \
-            \) \
-            -print \
-            -quit 2>/dev/null || true)"
-
-          if [ -n "$FMT_CONFIG" ]; then
-            FMT_DIR="$(dirname "$FMT_CONFIG")"
-
-            echo "fmt config:"
-            echo "$FMT_CONFIG"
-
-            echo "fmt CMake directory:"
-            echo "$FMT_DIR"
-          else
-            echo "fmt package config not found."
-            FMT_DIR=""
-          fi
-
-          echo ""
-          echo "========================================"
-          echo "VERIFYING DEPENDENCIES"
-          echo "========================================"
-
-          test -x "$PYTHON_EXECUTABLE"
-          test -f "$PYTHON_INCLUDE_DIR/Python.h"
-          test -f "$PYTHON_LIBRARY"
-
-          test -f "$FREETYPE_INCLUDE_DIR/ft2build.h"
-          test -f "$FREETYPE_LIBRARY"
-
-          test -f "$OPENEXR_CONFIG"
-
-          test -f "$PNG_INCLUDE_DIR/png.h"
-          test -f "$PNG_LIBRARY"
-
-          test -f "$JPEG_INCLUDE_DIR/jpeglib.h"
-          test -f "$JPEG_LIBRARY"
-
-          test -f "$TIFF_INCLUDE_DIR/tiff.h"
-          test -f "$TIFF_LIBRARY"
-
-          echo ""
-          echo "Python:"
-          "$PYTHON_EXECUTABLE" --version
-
-          echo ""
-          echo "All required dependency files found."
 
           rm -rf build_ios
 
-          echo ""
           echo "========================================"
-          echo "RUNNING CMAKE"
+          echo "GENERATING XCODE PROJECT"
           echo "========================================"
 
-          CMAKE_PREFIXES="$IOS_ROOT;$OPENEXR_DIR"
+          cmake -G Xcode -S . -B build_ios
 
-          if [ -n "$FMT_DIR" ]; then
-            CMAKE_PREFIXES="$CMAKE_PREFIXES;$FMT_DIR"
-          fi
-
-          cmake -S . -B build_ios \
-            -G Xcode \
-            -DCMAKE_SYSTEM_NAME=iOS \
-            -DCMAKE_OSX_SYSROOT=iphoneos \
-            -DCMAKE_OSX_ARCHITECTURES=arm64 \
-            -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_PREFIX_PATH="$CMAKE_PREFIXES" \
-            -DOpenEXR_DIR="$OPENEXR_DIR" \
-            -DPYTHON_VERSION=3.13 \
-            -DPYTHON_EXECUTABLE="$PYTHON_EXECUTABLE" \
-            -DPYTHON_INCLUDE_DIR="$PYTHON_INCLUDE_DIR" \
-            -DPYTHON_LIBRARY="$PYTHON_LIBRARY" \
-            -DPYTHON_INCLUDE_CONFIG_DIR="$PYTHON_INCLUDE_CONFIG_DIR" \
-            -DFREETYPE_INCLUDE_DIRS="$FREETYPE_INCLUDE_DIR" \
-            -DFREETYPE_LIBRARY="$FREETYPE_LIBRARY" \
-            -DPNG_PNG_INCLUDE_DIR="$PNG_INCLUDE_DIR" \
-            -DPNG_LIBRARY="$PNG_LIBRARY" \
-            -DJPEG_INCLUDE_DIR="$JPEG_INCLUDE_DIR" \
-            -DJPEG_LIBRARY="$JPEG_LIBRARY" \
-            -DTIFF_INCLUDE_DIR="$TIFF_INCLUDE_DIR" \
-            -DTIFF_LIBRARY="$TIFF_LIBRARY"
-
-      - name: Build Blender
+      - name: List Xcode Targets
         run: |
           set -e
 
           echo "========================================"
-          echo "BUILDING BLENDER"
+          echo "XCODE TARGETS"
           echo "========================================"
 
-          cmake --build build_ios \
-            --config Release \
-            --parallel "$(sysctl -n hw.ncpu)"
+          xcodebuild \
+            -project build_ios/Blender.xcodeproj \
+            -list
 
-      - name: Find Blender App
+      - name: Build Cross Compilation Tools
         run: |
           set -e
 
+          echo "========================================"
+          echo "BUILDING CROSS COMPILATION TOOLS"
+          echo "========================================"
+
+          xcodebuild \
+            -project build_ios/Blender.xcodeproj \
+            -target blender_cross_tools_compile \
+            -configuration Release \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO \
+            | tee cross_tools_build.log
+
+      - name: Build Blender iOS App
+        run: |
+          set -e
+
+          echo "========================================"
+          echo "BUILDING BLENDER FOR iOS"
+          echo "========================================"
+
+          xcodebuild \
+            -project build_ios/Blender.xcodeproj \
+            -target install \
+            -sdk iphoneos \
+            -configuration Release \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO \
+            ARCHS=arm64 \
+            | tee ios_build.log
+
+      - name: Locate Blender.app
+        run: |
           echo "========================================"
           echo "SEARCHING FOR BLENDER.APP"
           echo "========================================"
@@ -330,34 +223,64 @@ jobs:
         run: |
           set -e
 
-          APP="$(find build_ios \
-            -type d \
-            -name "Blender.app" \
-            -print \
-            -quit)"
+          echo "========================================"
+          echo "PACKAGING IPA"
+          echo "========================================"
 
-          if [ -z "$APP" ]; then
-            echo "ERROR: Blender.app was not produced."
+          APP="build_ios/bin/Release/Blender.app"
+
+          if [ ! -d "$APP" ]; then
+            echo "Expected Blender.app was not found."
+            echo "Searching build directory..."
+
+            find build_ios \
+              -type d \
+              -name "*.app" \
+              -print
+
             exit 1
           fi
 
           echo "Found Blender.app:"
           echo "$APP"
 
-          rm -rf Payload
-          mkdir -p Payload
+          echo ""
+          echo "App size:"
+          du -sh "$APP"
 
-          cp -R "$APP" Payload/Blender.app
+          rm -rf IPA
+          mkdir -p IPA/Payload
 
-          /usr/bin/ditto \
-            -c -k \
-            --sequesterRsrc \
-            --keepParent \
-            Payload \
-            Blender-iPad-unsigned.ipa
+          cp -R "$APP" IPA/Payload/Blender.app
+
+          cd IPA
+
+          /usr/bin/zip \
+            -r \
+            ../Blender-iPad-unsigned.ipa \
+            Payload/
+
+          cd ..
+
+          echo ""
+          echo "IPA created:"
+          ls -lh Blender-iPad-unsigned.ipa
 
       - name: Upload IPA
         uses: actions/upload-artifact@v4
         with:
-          name: Blender-iPad-unsigned
+          name: blender-ipad-unsigned
           path: Blender-iPad-unsigned.ipa
+          retention-days: 30
+
+      - name: Upload Build Logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: blender-ios-build-logs
+          path: |
+            cross_tools_build.log
+            ios_build.log
+            build_ios/**/*.log
+            build_ios/**/*.txt
+          retention-days: 7
