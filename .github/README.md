@@ -5,7 +5,7 @@ See 'release/text/readme.html' for the end user read-me.
 -->
 
 [!DISCLAMER]
-Code written with the help of chatGPT. Contains questionable choices and weird approaches. I did this for educational purposes, learning about YAML and what github actions can do. PLEASE DONT JUDUGE 🙏
+Code written with the help of chatGPT. Contains questionable choices and weird approaches. I started this project to compile the source code into a ipa since i dont have a mac and I am also doing it educational purposes, learning about YAML and what github actions can do. PLEASE DONT JUDUGE 🙏
 
 > [!IMPORTANT]
 > Cloning from this [GitHub mirror](https://github.com/blender/blender) may cause Git LFS errors. To avoid this, use `GIT_LFS_SKIP_SMUDGE=1` when doing your initial clone.  
