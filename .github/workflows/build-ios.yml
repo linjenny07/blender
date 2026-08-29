@@ -1,4 +1,4 @@
-name: Build Blender iOS IPA - Dependency Investigation
+name: Build Blender iOS IPA
 
 on:
   workflow_dispatch:
@@ -26,82 +26,42 @@ jobs:
           sudo rm -rf /opt/ghc
           sudo rm -rf /usr/local/.ghcup
           sudo rm -rf /Library/Developer/CoreSimulator/Profiles
-
           sudo xcrun simctl delete all 2>/dev/null || true
-
           df -h
 
-      - name: Install Host Build Tools
+      - name: Install Build Tools
         run: |
           brew install git-lfs cmake ninja
-
           echo "/opt/homebrew/bin" >> "$GITHUB_PATH"
 
       - name: Initialize Git LFS
         run: |
           git lfs install
 
-      - name: Show Source Revision
-        run: |
-          echo "========================================"
-          echo "SOURCE REVISION"
-          echo "========================================"
-
-          git rev-parse HEAD
-          git branch --show-current
-          git status --short
-
       - name: Fetch Blender Dependencies
         run: |
           set -e
 
-          echo "========================================"
-          echo "FETCHING BLENDER DEPENDENCIES"
-          echo "========================================"
-
           ./build_files/utils/make_update.py --use-ios-libraries
 
-      - name: Inspect iOS Build Scripts
+      - name: Inspect iOS Libraries
         run: |
-          echo "========================================"
-          echo "IOS BUILD SCRIPTS"
-          echo "========================================"
+          set -e
 
-          echo ""
-          echo "Files in build_files/utils:"
-          find build_files/utils \
-            -maxdepth 1 \
-            -type f \
-            -print \
-            | sort
-
-          echo ""
-          echo "iOS-related scripts/files:"
-          find build_files \
-            -type f \
-            \( \
-              -iname "*ios*" \
-              -o -iname "*fmt*" \
-              -o -iname "*eigen*" \
-            \) \
-            -print \
-            | sort \
-            | head -300
-
-      - name: Inspect iOS Library
-        run: |
           echo "========================================"
-          echo "IOS LIBRARY"
+          echo "IOS LIBRARY CHECK"
           echo "========================================"
 
-          if [ ! -d "lib/ios_arm64" ]; then
+          IOS_ROOT="$PWD/lib/ios_arm64"
+
+          if [ ! -d "$IOS_ROOT" ]; then
             echo "ERROR: lib/ios_arm64 does not exist."
             exit 1
           fi
 
           echo ""
-          echo "Top-level iOS libraries:"
-          find lib/ios_arm64 \
+          echo "Libraries:"
+          find "$IOS_ROOT" \
             -mindepth 1 \
             -maxdepth 1 \
             -type d \
@@ -109,70 +69,62 @@ jobs:
             | sort
 
           echo ""
-          echo "fmt:"
-          if [ -d "lib/ios_arm64/fmt" ]; then
-            find lib/ios_arm64/fmt \
-              -maxdepth 5 \
-              -type f \
-              -print \
-              | head -100
-          else
-            echo "fmt directory does not exist."
-          fi
-
-          echo ""
-          echo "Eigen:"
-          if [ -d "lib/ios_arm64/eigen" ]; then
-            find lib/ios_arm64/eigen \
-              -maxdepth 5 \
-              -type f \
-              -print \
-              | head -100
-          else
-            echo "Eigen directory does not exist."
-          fi
-
-          echo ""
           echo "OpenEXR:"
-          if [ -d "lib/ios_arm64/openexr" ]; then
-            find lib/ios_arm64/openexr \
-              -maxdepth 5 \
-              -type f \
-              -print \
-              | head -150
-          else
-            echo "OpenEXR directory does not exist."
-          fi
+          find "$IOS_ROOT/openexr" \
+            -maxdepth 5 \
+            -type f \
+            -print 2>/dev/null \
+            | head -100 || true
 
-      - name: Inspect Dependency References
+          echo ""
+          echo "fmt:"
+          find "$IOS_ROOT/fmt" \
+            -maxdepth 5 \
+            -type f \
+            -print 2>/dev/null \
+            | head -100 || true
+
+      - name: Configure Host Python
         run: |
-          echo "========================================"
-          echo "DEPENDENCY REFERENCES"
-          echo "========================================"
+          set -e
 
-          grep -Rni \
-            --exclude-dir=.git \
-            -E "ios_arm64|bootstrap_ios|fmt|eigen|OpenEXR" \
-            build_files \
-            CMakeLists.txt \
-            2>/dev/null \
-            | head -400 || true
+          MACOS_ROOT="$PWD/lib/macos_arm64"
+          PYTHON_ROOT="$MACOS_ROOT/python"
 
-      - name: Verify Host Python
-        run: |
+          PYTHON_EXECUTABLE="$PYTHON_ROOT/bin/python3.13"
+          PYTHON_INCLUDE_DIR="$PYTHON_ROOT/include/python3.13"
+          PYTHON_LIBRARY="$PYTHON_ROOT/lib/libpython3.13.a"
+          PYTHON_INCLUDE_CONFIG_DIR="$PYTHON_ROOT/lib/python3.13/config-3.13-darwin"
+
           echo "========================================"
           echo "HOST PYTHON"
           echo "========================================"
 
-          if [ -x "lib/macos_arm64/python/bin/python3.13" ]; then
-            echo "Found Blender host Python:"
-            lib/macos_arm64/python/bin/python3.13 --version
-          else
-            echo "Host Python 3.13 was not found."
-          fi
+          test -x "$PYTHON_EXECUTABLE"
+          test -f "$PYTHON_INCLUDE_DIR/Python.h"
+          test -f "$PYTHON_LIBRARY"
+
+          echo "Python executable:"
+          echo "$PYTHON_EXECUTABLE"
+
+          "$PYTHON_EXECUTABLE" --version
+
+          echo ""
+          echo "Python include:"
+          echo "$PYTHON_INCLUDE_DIR"
+
+          echo ""
+          echo "Python library:"
+          echo "$PYTHON_LIBRARY"
+
+          echo ""
+          echo "Python config:"
+          echo "$PYTHON_INCLUDE_CONFIG_DIR"
 
       - name: Show Apple Toolchain
         run: |
+          set -e
+
           echo "========================================"
           echo "APPLE TOOLCHAIN"
           echo "========================================"
@@ -199,16 +151,40 @@ jobs:
         run: |
           set -e
 
+          IOS_ROOT="$PWD/lib/ios_arm64"
+          MACOS_ROOT="$PWD/lib/macos_arm64"
+          PYTHON_ROOT="$MACOS_ROOT/python"
+
+          PYTHON_EXECUTABLE="$PYTHON_ROOT/bin/python3.13"
+          PYTHON_INCLUDE_DIR="$PYTHON_ROOT/include/python3.13"
+          PYTHON_LIBRARY="$PYTHON_ROOT/lib/libpython3.13.a"
+          PYTHON_INCLUDE_CONFIG_DIR="$PYTHON_ROOT/lib/python3.13/config-3.13-darwin"
+
+          rm -rf build_ios
+
           echo "========================================"
           echo "GENERATING XCODE PROJECT"
           echo "========================================"
 
-          rm -rf build_ios
-
           cmake \
             -G Xcode \
             -S . \
-            -B build_ios
+            -B build_ios \
+            -DCMAKE_SYSTEM_NAME=iOS \
+            -DCMAKE_OSX_SYSROOT=iphoneos \
+            -DCMAKE_OSX_ARCHITECTURES=arm64 \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_PREFIX_PATH="$IOS_ROOT" \
+            -DCMAKE_FIND_ROOT_PATH="$IOS_ROOT" \
+            -DCMAKE_FIND_ROOT_PATH_MODE_PROGRAM=NEVER \
+            -DCMAKE_FIND_ROOT_PATH_MODE_LIBRARY=ONLY \
+            -DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=ONLY \
+            -DCMAKE_FIND_ROOT_PATH_MODE_PACKAGE=ONLY \
+            -DPYTHON_VERSION=3.13 \
+            -DPYTHON_EXECUTABLE="$PYTHON_EXECUTABLE" \
+            -DPYTHON_INCLUDE_DIR="$PYTHON_INCLUDE_DIR" \
+            -DPYTHON_LIBRARY="$PYTHON_LIBRARY" \
+            -DPYTHON_INCLUDE_CONFIG_DIR="$PYTHON_INCLUDE_CONFIG_DIR"
 
       - name: List Xcode Targets
         run: |
