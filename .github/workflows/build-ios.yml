@@ -41,7 +41,6 @@ jobs:
       - name: Fetch Blender Dependencies
         run: |
           set -e
-
           ./build_files/utils/make_update.py --use-ios-libraries
 
       - name: Inspect iOS Libraries
@@ -185,14 +184,104 @@ jobs:
           echo "Directories:"
           find "$ROOT" -maxdepth 4 -type d -print | sort
 
-      - name: Inspect OpenEXR CMake Logic
+      - name: Create OpenEXR CMake Find Module
         run: |
+          set -e
+
           echo "========================================"
-          echo "BLENDER OPENEXR CMAKE LOGIC"
+          echo "CREATING OPENEXR FIND MODULE"
           echo "========================================"
 
-          sed -n '320,365p' \
-            build_files/cmake/platform/platform_apple.cmake
+          mkdir -p cmake/modules
+
+          cat > cmake/modules/FindOpenEXR.cmake <<'EOF'
+          set(OpenEXR_ROOT "${CMAKE_CURRENT_LIST_DIR}/../../lib/ios_arm64/openexr")
+
+          find_path(
+            OpenEXR_INCLUDE_DIR
+            NAMES OpenEXR/ImfHeader.h OpenEXR/Iex.h
+            PATHS "${OpenEXR_ROOT}/include"
+            NO_DEFAULT_PATH
+          )
+
+          find_library(
+            OpenEXR_LIBRARY
+            NAMES OpenEXR
+            PATHS "${OpenEXR_ROOT}/lib"
+            NO_DEFAULT_PATH
+          )
+
+          find_library(
+            OpenEXR_CORE_LIBRARY
+            NAMES OpenEXRCore
+            PATHS "${OpenEXR_ROOT}/lib"
+            NO_DEFAULT_PATH
+          )
+
+          find_library(
+            OpenEXR_UTIL_LIBRARY
+            NAMES OpenEXRUtil
+            PATHS "${OpenEXR_ROOT}/lib"
+            NO_DEFAULT_PATH
+          )
+
+          find_library(
+            OPENEXR_IEX_LIBRARY
+            NAMES Iex
+            PATHS "${OpenEXR_ROOT}/lib"
+            NO_DEFAULT_PATH
+          )
+
+          find_library(
+            OPENEXR_ILMTHREAD_LIBRARY
+            NAMES IlmThread
+            PATHS "${OpenEXR_ROOT}/lib"
+            NO_DEFAULT_PATH
+          )
+
+          include(FindPackageHandleStandardArgs)
+
+          find_package_handle_standard_args(
+            OpenEXR
+            REQUIRED_VARS
+              OpenEXR_INCLUDE_DIR
+              OpenEXR_LIBRARY
+              OpenEXR_CORE_LIBRARY
+          )
+
+          if(OpenEXR_FOUND)
+            set(OpenEXR_INCLUDE_DIRS "${OpenEXR_INCLUDE_DIR}")
+
+            set(OpenEXR_LIBRARIES
+              "${OpenEXR_LIBRARY}"
+              "${OpenEXR_CORE_LIBRARY}"
+              "${OpenEXR_UTIL_LIBRARY}"
+              "${OPENEXR_IEX_LIBRARY}"
+              "${OPENEXR_ILMTHREAD_LIBRARY}"
+            )
+
+            if(NOT TARGET OpenEXR::OpenEXR)
+              add_library(OpenEXR::OpenEXR UNKNOWN IMPORTED)
+              set_target_properties(OpenEXR::OpenEXR PROPERTIES
+                IMPORTED_LOCATION "${OpenEXR_LIBRARY}"
+                INTERFACE_INCLUDE_DIRECTORIES "${OpenEXR_INCLUDE_DIR}"
+              )
+            endif()
+          endif()
+
+          mark_as_advanced(
+            OpenEXR_INCLUDE_DIR
+            OpenEXR_LIBRARY
+            OpenEXR_CORE_LIBRARY
+            OpenEXR_UTIL_LIBRARY
+            OPENEXR_IEX_LIBRARY
+            OPENEXR_ILMTHREAD_LIBRARY
+          )
+          EOF
+
+          echo ""
+          echo "Created:"
+          cat cmake/modules/FindOpenEXR.cmake
 
       - name: Generate Xcode Project
         run: |
@@ -221,12 +310,13 @@ jobs:
             -DCMAKE_OSX_SYSROOT=iphoneos \
             -DCMAKE_OSX_ARCHITECTURES=arm64 \
             -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_MODULE_PATH="$PWD/cmake/modules" \
             -DCMAKE_PREFIX_PATH="$IOS_ROOT" \
             -DCMAKE_FIND_ROOT_PATH="$IOS_ROOT" \
             -DCMAKE_FIND_ROOT_PATH_MODE_PROGRAM=NEVER \
             -DCMAKE_FIND_ROOT_PATH_MODE_LIBRARY=ONLY \
             -DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=ONLY \
-            -DCMAKE_FIND_ROOT_PATH_MODE_PACKAGE=ONLY \
+            -DCMAKE_FIND_ROOT_PATH_MODE_PACKAGE=BOTH \
             -DPYTHON_VERSION=3.13 \
             -DPYTHON_EXECUTABLE="$PYTHON_EXECUTABLE" \
             -DPYTHON_INCLUDE_DIR="$PYTHON_INCLUDE_DIR" \
